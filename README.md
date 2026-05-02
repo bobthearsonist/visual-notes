@@ -26,13 +26,58 @@ the visual.
 
 ```mermaid
 flowchart LR
-    Sources["Manual notes<br/>AI summaries<br/>Mobile edits<br/>Templates"] --> Note[("Daily note<br/>YYYYMMDD.md")]
-    Note --> Plugin["Obsidian plugin<br/>watch + debounce"]
-    Plugin --> Claude(("Claude API"))
-    Claude --> Sidecar[("YYYYMMDD-overview.json")]
-    Sidecar --> Graph["Cytoscape concept map<br/>rendered inline"]
-    Graph -. shown in .-> Note
+    classDef input fill:#eef2ff,stroke:#4f46e5,stroke-width:2px,color:#111827
+    classDef plugin fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#0f172a
+    classDef ai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#111827
+    classDef data fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#052e16
+    classDef render fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#111827
+    classDef future fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,stroke-dasharray: 5 5,color:#334155
+
+    subgraph Sources["Everyday note inputs"]
+        Manual["Manual notes"]
+        Sessions["AI session summaries"]
+        Mobile["Mobile edits"]
+        Templates["Templates and automations"]
+    end
+
+    Note[("Watched daily note<br/>YYYYMMDD.md")]
+
+    subgraph Plugin["Visual Notes Obsidian plugin"]
+        Watch["Watch + debounce"]
+        Hash["Hash unchanged notes"]
+        Extract["Extract graph"]
+        Validate["Validate schema"]
+        Render["Render inline"]
+    end
+
+    Claude(("Anthropic Claude"))
+    Sidecar[("Graph sidecar<br/>YYYYMMDD-overview.json")]
+    Pane["Interactive Cytoscape map<br/>inside the note"]
+    Future["Future: section-aware<br/>idempotent updates"]
+
+    Manual --> Note
+    Sessions --> Note
+    Mobile --> Note
+    Templates --> Note
+    Note --> Watch --> Hash --> Extract --> Claude
+    Claude --> Validate --> Sidecar --> Render --> Pane
+    Pane -. displayed above note content .-> Note
+    Future -. planned evolution .-> Hash
+
+    class Manual,Sessions,Mobile,Templates,Note input
+    class Watch,Hash,Extract,Validate,Render plugin
+    class Claude ai
+    class Sidecar data
+    class Pane render
+    class Future future
 ```
+
+## What it looks like in Obsidian
+
+Visual Notes renders as a card at the top of the note in both reading and edit
+views. The graph is interactive; the note remains normal markdown underneath.
+
+![Example Obsidian note with a Visual Notes concept map card](docs/assets/obsidian-note-preview.svg)
 
 Feature overview:
 
