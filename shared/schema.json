@@ -71,7 +71,8 @@
           },
           "classes": {
             "type": "string",
-            "description": "Space-separated class list. Combine one type class with one status class. Type: system|task|decision. Status: completed|active|context|blocked.",
+            "pattern": "^(system|task|decision) (completed|active|context|blocked)$",
+            "description": "Space-separated class list: exactly one type class + exactly one status class, in that order. Pattern enforces the rule the extraction prompt's heuristic 4 and 5 describe in prose. Type: system|task|decision. Status: completed|active|context|blocked.",
             "examples": ["system completed", "task active", "decision context"]
           },
           "position": {
