@@ -5,6 +5,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+.test-build/
 *.js.map
 plugins/obsidian-plugin/main.js
 plugins/obsidian-plugin/styles.css.bak

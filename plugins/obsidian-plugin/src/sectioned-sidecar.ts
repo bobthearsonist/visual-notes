@@ -15,8 +15,16 @@ interface MergeSectionedGraphResult {
 }
 
 export function mergeSectionedGraph(options: MergeSectionedGraphOptions): MergeSectionedGraphResult {
-  const extractedNodes = cloneNodes(options.extracted.nodes);
-  const extractedEdges = withStableEdgeIds(options.extracted.edges);
+  const sectionIds = new Set(options.sections.map((section) => section.id));
+  const fallbackSectionId = fallbackSectionIdFor(options.sections);
+  const extractedNodes = normalizeNodeSectionReferences(
+    cloneNodes(options.extracted.nodes),
+    sectionIds,
+    fallbackSectionId,
+  );
+  const extractedEdges = withStableEdgeIds(
+    normalizeEdgeSectionReferences(options.extracted.edges, sectionIds, fallbackSectionId),
+  );
   const existingSections = options.existing?._sections ?? null;
 
   if (!options.existing || !existingSections || options.force) {
@@ -214,6 +222,57 @@ function edgeId(edge: VisualNotesEdge): string {
 function sectionIdFromData(data: object): string | null {
   const sectionId = stringFromData(data, "sectionId");
   return sectionId && isSlug(sectionId) ? sectionId : null;
+}
+
+function normalizeNodeSectionReferences(
+  nodes: VisualNotesNode[],
+  sectionIds: Set<string>,
+  fallbackSectionId: string | null,
+): VisualNotesNode[] {
+  return nodes.map((node) => {
+    const sectionId = sectionIdFromData(node.data);
+    if (sectionId && sectionIds.has(sectionId)) {
+      return node;
+    }
+
+    const data = { ...node.data };
+    delete data.sectionId;
+    if (fallbackSectionId) {
+      data.sectionId = fallbackSectionId;
+    }
+
+    return { ...node, data };
+  });
+}
+
+function normalizeEdgeSectionReferences(
+  edges: VisualNotesEdge[],
+  sectionIds: Set<string>,
+  fallbackSectionId: string | null,
+): VisualNotesEdge[] {
+  return edges.map((edge) => {
+    const sectionId = sectionIdFromData(edge.data);
+    if (sectionId && sectionIds.has(sectionId)) {
+      return cloneEdge(edge);
+    }
+
+    const data = { ...edge.data };
+    delete data.sectionId;
+    if (fallbackSectionId) {
+      data.sectionId = fallbackSectionId;
+    }
+
+    return { ...edge, data };
+  });
+}
+
+function fallbackSectionIdFor(sections: MarkdownSectionSummary[]): string | null {
+  if (sections.length === 1) {
+    return sections[0].id;
+  }
+
+  const nonDocumentSections = sections.filter((section) => section.id !== "document");
+  return nonDocumentSections.length === 1 ? nonDocumentSections[0].id : null;
 }
 
 function stringFromData(data: object, key: string): string | null {
