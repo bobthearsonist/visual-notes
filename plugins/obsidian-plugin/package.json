@@ -10,6 +10,7 @@
     "typecheck": "tsc -noEmit -skipLibCheck",
     "test:feature": "node test/run-feature-tests.mjs",
     "lint": "tsc -noEmit -skipLibCheck",
+    "layout:metrics": "node scripts/layout-metrics.mjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": ["obsidian", "plugin", "concept-map", "visual-notes"],

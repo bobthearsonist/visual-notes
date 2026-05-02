@@ -1,13 +1,12 @@
 import type { VisualNotesEdge, VisualNotesNode, VisualNotesSidecar } from "./schema";
 
-const CLUSTER_START_X = 220;
-const CLUSTER_START_Y = 120;
-const CLUSTER_SPACING_X = 470;
-const CLUSTER_SPACING_Y = 580;
-const TIER_GAP_Y = 48;
-const NODE_GAP_X = 170;
-const NODE_GAP_Y = 128;
-const MAX_COLUMNS = 10;
+const CLUSTER_START_X = 260;
+const CLUSTER_START_Y = 150;
+const CLUSTER_SPACING_X = 450;
+const CLUSTER_GAP_Y = 170;
+const MAX_CLUSTER_COLUMNS = 2;
+const COLLISION_RADIUS_X = 120;
+const COLLISION_RADIUS_Y = 92;
 const MAX_X = 5000;
 const MAX_Y = 3000;
 const MIN_X = -200;
@@ -15,6 +14,12 @@ const MIN_Y = -200;
 
 type NodeType = "system" | "task" | "decision";
 type NodeStatus = "completed" | "active" | "context" | "blocked";
+type SlotBucket = "systems" | "outcomes" | "decisions" | "blocked" | "context" | "other";
+
+interface Position {
+  x: number;
+  y: number;
+}
 
 interface NodeInfo {
   node: VisualNotesNode;
@@ -31,6 +36,73 @@ interface Component {
   anchorId: string;
 }
 
+export interface LayoutMetrics {
+  nodeCount: number;
+  edgeCount: number;
+  componentCount: number;
+  weakEdgeCount: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  width: number;
+  height: number;
+  aspectRatio: number;
+  averageDistanceFromCentroid: number;
+  maxDistanceFromCentroid: number;
+}
+
+const PREFERRED_SLOTS: Record<SlotBucket, Position[]> = {
+  systems: [
+    { x: -120, y: -105 },
+    { x: -120, y: 105 },
+    { x: -245, y: -20 },
+    { x: -245, y: -150 },
+    { x: -245, y: 150 },
+    { x: -120, y: -235 },
+    { x: -120, y: 235 },
+  ],
+  outcomes: [
+    { x: 200, y: -75 },
+    { x: 200, y: 75 },
+    { x: 220, y: -205 },
+    { x: 220, y: 205 },
+    { x: 345, y: -20 },
+    { x: 345, y: -150 },
+    { x: 345, y: 150 },
+  ],
+  decisions: [
+    { x: 100, y: 200 },
+    { x: -45, y: 255 },
+    { x: 245, y: 255 },
+    { x: 100, y: 350 },
+    { x: -45, y: 405 },
+    { x: 245, y: 405 },
+  ],
+  blocked: [
+    { x: 0, y: 285 },
+    { x: -145, y: 330 },
+    { x: 145, y: 330 },
+    { x: -290, y: 330 },
+    { x: 290, y: 330 },
+  ],
+  context: [
+    { x: -245, y: 275 },
+    { x: -245, y: 405 },
+    { x: 0, y: -235 },
+    { x: 145, y: -235 },
+    { x: -145, y: -365 },
+    { x: 145, y: -365 },
+  ],
+  other: [
+    { x: 0, y: -235 },
+    { x: 145, y: -235 },
+    { x: -145, y: -365 },
+    { x: 145, y: -365 },
+    { x: 0, y: 480 },
+  ],
+};
+
 export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNotesSidecar {
   if (sidecar._pinned) {
     return sidecar;
@@ -44,9 +116,70 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
   };
 }
 
+export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetrics {
+  const positions = sidecar.nodes.map((node) => node.position);
+  const minX = Math.min(...positions.map((position) => position.x));
+  const maxX = Math.max(...positions.map((position) => position.x));
+  const minY = Math.min(...positions.map((position) => position.y));
+  const maxY = Math.max(...positions.map((position) => position.y));
+  const centroid = {
+    x: positions.reduce((sum, position) => sum + position.x, 0) / positions.length,
+    y: positions.reduce((sum, position) => sum + position.y, 0) / positions.length,
+  };
+  const distances = positions.map((position) => distance(position, centroid));
+  const infoById = buildInfoById(sidecar.nodes, sidecar.edges);
+  const components = findComponents(sidecar.nodes, sidecar.edges, infoById);
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  return {
+    nodeCount: sidecar.nodes.length,
+    edgeCount: sidecar.edges.length,
+    componentCount: components.length,
+    weakEdgeCount: sidecar.edges.filter((edge) => edge.classes === "weak-edge").length,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width,
+    height,
+    aspectRatio: height === 0 ? width : width / height,
+    averageDistanceFromCentroid:
+      distances.reduce((sum, current) => sum + current, 0) / Math.max(distances.length, 1),
+    maxDistanceFromCentroid: Math.max(...distances),
+  };
+}
+
 function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): VisualNotesNode[] {
+  const infoById = buildInfoById(nodes, edges);
+  const positionById = new Map<string, Position>();
+  const components = findComponents(nodes, edges, infoById);
+  const columnCount = Math.min(MAX_CLUSTER_COLUMNS, Math.max(components.length, 1));
+  const columnBottoms = Array.from({ length: columnCount }, () => CLUSTER_START_Y);
+
+  components.forEach((component, componentIndex) => {
+    const column = columnForComponent(componentIndex, columnBottoms);
+    const anchor = {
+      x: CLUSTER_START_X + column * CLUSTER_SPACING_X,
+      y: columnBottoms[column],
+    };
+    const extent = layoutComponent(component, anchor, positionById);
+    columnBottoms[column] = extent.maxY + CLUSTER_GAP_Y;
+  });
+
+  return nodes.map((node) => ({
+    ...node,
+    position: positionById.get(node.data.id) ?? node.position,
+  }));
+}
+
+function buildInfoById(
+  nodes: VisualNotesNode[],
+  edges: VisualNotesEdge[],
+): Map<string, NodeInfo> {
   const degreeById = calculateDegree(nodes, edges);
-  const infoById = new Map(
+
+  return new Map(
     nodes.map((node, index): [string, NodeInfo] => {
       const classes = parseNodeClasses(node.classes);
       const id = node.data.id;
@@ -63,45 +196,155 @@ function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Visual
       ];
     }),
   );
-  const positionById = new Map<string, { x: number; y: number }>();
-  const components = findComponents(nodes, edges, infoById);
+}
 
-  components.forEach((component, componentIndex) => {
-    const column = componentIndex % MAX_COLUMNS;
-    const row = Math.floor(componentIndex / MAX_COLUMNS);
-    const centerX = CLUSTER_START_X + column * CLUSTER_SPACING_X;
-    const topY = CLUSTER_START_Y + row * CLUSTER_SPACING_Y;
-    const maxDegree = Math.max(...component.nodes.map((node) => node.degree), 0);
-    const tieredNodes = groupByTier(component.nodes, maxDegree);
-    const nodesPerRow = nodesPerRowForComponent(component.nodes.length, components.length);
-    let yCursor = topY;
+function layoutComponent(
+  component: Component,
+  anchor: Position,
+  positionById: Map<string, Position>,
+): { minY: number; maxY: number } {
+  const [anchorNode, ...remainingNodes] = component.nodes;
+  const usedPositions: Position[] = [];
+  const componentPositions: Position[] = [];
 
-    tieredNodes.forEach((tierNodes) => {
-      if (tierNodes.length === 0) {
-        return;
-      }
+  if (!anchorNode) {
+    return { minY: anchor.y, maxY: anchor.y };
+  }
 
-      const rowCount = Math.ceil(tierNodes.length / nodesPerRow);
-      tierNodes.forEach((node, index) => {
-        const rowIndex = Math.floor(index / nodesPerRow);
-        const itemsInRow = Math.min(nodesPerRow, tierNodes.length - rowIndex * nodesPerRow);
-        const columnIndex = index % nodesPerRow;
-        const centeredColumn = columnIndex - (itemsInRow - 1) / 2;
+  setPosition(anchorNode.id, anchor, positionById, usedPositions, componentPositions);
 
-        positionById.set(node.id, {
-          x: clamp(centerX + centeredColumn * NODE_GAP_X, MIN_X, MAX_X),
-          y: clamp(yCursor + rowIndex * NODE_GAP_Y, MIN_Y, MAX_Y),
-        });
-      });
+  const buckets = bucketNodes(remainingNodes);
+  const bucketOrder: SlotBucket[] = ["systems", "outcomes", "decisions", "blocked", "context", "other"];
 
-      yCursor += rowCount * NODE_GAP_Y + TIER_GAP_Y;
+  bucketOrder.forEach((bucket) => {
+    buckets[bucket].forEach((node, index) => {
+      const position = findOpenSlot(anchor, PREFERRED_SLOTS[bucket], index, usedPositions);
+      setPosition(node.id, position, positionById, usedPositions, componentPositions);
     });
   });
 
-  return nodes.map((node) => ({
-    ...node,
-    position: positionById.get(node.data.id) ?? node.position,
-  }));
+  return {
+    minY: Math.min(...componentPositions.map((position) => position.y)),
+    maxY: Math.max(...componentPositions.map((position) => position.y)),
+  };
+}
+
+function setPosition(
+  id: string,
+  position: Position,
+  positionById: Map<string, Position>,
+  usedPositions: Position[],
+  componentPositions: Position[],
+): void {
+  const clamped = {
+    x: clamp(Math.round(position.x), MIN_X, MAX_X),
+    y: clamp(Math.round(position.y), MIN_Y, MAX_Y),
+  };
+
+  positionById.set(id, clamped);
+  usedPositions.push(clamped);
+  componentPositions.push(clamped);
+}
+
+function bucketNodes(nodes: NodeInfo[]): Record<SlotBucket, NodeInfo[]> {
+  const buckets: Record<SlotBucket, NodeInfo[]> = {
+    systems: [],
+    outcomes: [],
+    decisions: [],
+    blocked: [],
+    context: [],
+    other: [],
+  };
+
+  nodes.forEach((node) => {
+    buckets[bucketForNode(node)].push(node);
+  });
+
+  Object.values(buckets).forEach((bucket) =>
+    bucket.sort((a, b) => scoreNode(b) - scoreNode(a) || a.id.localeCompare(b.id)),
+  );
+
+  return buckets;
+}
+
+function bucketForNode(node: NodeInfo): SlotBucket {
+  if (node.type === "system") {
+    return "systems";
+  }
+
+  if (node.type === "decision") {
+    return "decisions";
+  }
+
+  if (node.status === "blocked") {
+    return "blocked";
+  }
+
+  if (node.status === "completed" || node.status === "active") {
+    return "outcomes";
+  }
+
+  if (node.status === "context") {
+    return "context";
+  }
+
+  return "other";
+}
+
+function findOpenSlot(
+  anchor: Position,
+  preferredSlots: Position[],
+  preferredIndex: number,
+  usedPositions: Position[],
+): Position {
+  for (let offset = 0; offset < preferredSlots.length + 24; offset += 1) {
+    const slot = slotAt(preferredSlots, preferredIndex + offset);
+    const candidate = { x: anchor.x + slot.x, y: anchor.y + slot.y };
+
+    if (isOpen(candidate, usedPositions)) {
+      return candidate;
+    }
+  }
+
+  const fallback = overflowSlot(preferredIndex + preferredSlots.length + 24);
+  return { x: anchor.x + fallback.x, y: anchor.y + fallback.y };
+}
+
+function slotAt(preferredSlots: Position[], index: number): Position {
+  if (index < preferredSlots.length) {
+    return preferredSlots[index];
+  }
+
+  return overflowSlot(index - preferredSlots.length);
+}
+
+function overflowSlot(index: number): Position {
+  const row = Math.floor(index / 4);
+  const column = index % 4;
+
+  return {
+    x: -210 + column * 140,
+    y: 540 + row * 120,
+  };
+}
+
+function isOpen(candidate: Position, usedPositions: Position[]): boolean {
+  return usedPositions.every(
+    (used) =>
+      Math.abs(candidate.x - used.x) >= COLLISION_RADIUS_X ||
+      Math.abs(candidate.y - used.y) >= COLLISION_RADIUS_Y,
+  );
+}
+
+function columnForComponent(componentIndex: number, columnBottoms: number[]): number {
+  if (componentIndex < columnBottoms.length) {
+    return componentIndex;
+  }
+
+  return columnBottoms.reduce(
+    (bestColumn, bottom, column) => (bottom < columnBottoms[bestColumn] ? column : bestColumn),
+    0,
+  );
 }
 
 function calculateDegree(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Map<string, number> {
@@ -164,47 +407,6 @@ function findComponents(
     .sort((a, b) => b.score - a.score || a.anchorId.localeCompare(b.anchorId));
 }
 
-function groupByTier(nodes: NodeInfo[], maxDegree: number): NodeInfo[][] {
-  const tiers: NodeInfo[][] = [[], [], [], [], [], [], []];
-
-  nodes.forEach((node) => {
-    tiers[tierForNode(node, maxDegree)].push(node);
-  });
-
-  tiers.forEach((tier) => tier.sort((a, b) => scoreNode(b) - scoreNode(a) || a.id.localeCompare(b.id)));
-
-  return tiers;
-}
-
-function tierForNode(node: NodeInfo, maxDegree: number): number {
-  const isHub = node.degree > 1 && (node.degree === maxDegree || node.degree >= 3);
-  if (isHub || (node.degree >= 2 && (node.type === "system" || node.type === "decision"))) {
-    return 0;
-  }
-
-  if (node.type === "system") {
-    return 1;
-  }
-
-  if (node.status === "active") {
-    return 2;
-  }
-
-  if (node.type === "decision") {
-    return 3;
-  }
-
-  if (node.status === "completed") {
-    return 4;
-  }
-
-  if (node.status === "blocked") {
-    return 5;
-  }
-
-  return 6;
-}
-
 function sortNodes(nodes: NodeInfo[]): NodeInfo[] {
   return [...nodes].sort((a, b) => scoreNode(b) - scoreNode(a) || a.id.localeCompare(b.id));
 }
@@ -242,18 +444,6 @@ function statusWeight(status: NodeStatus): number {
   }
 }
 
-function nodesPerRowForComponent(componentSize: number, componentCount: number): number {
-  if (componentSize >= 10 || componentCount <= 2) {
-    return 3;
-  }
-
-  if (componentSize >= 5) {
-    return 2;
-  }
-
-  return 1;
-}
-
 function parseNodeClasses(classes: string): { type: NodeType; status: NodeStatus } {
   const [type, status] = classes.split(" ");
   return {
@@ -288,6 +478,10 @@ function union(parentById: Map<string, string>, left: string, right: string): vo
   if (leftRoot !== rightRoot) {
     parentById.set(rightRoot, leftRoot);
   }
+}
+
+function distance(left: Position, right: Position): number {
+  return Math.hypot(left.x - right.x, left.y - right.y);
 }
 
 function clamp(value: number, min: number, max: number): number {
