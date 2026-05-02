@@ -169,7 +169,7 @@ export default class VisualNotesPlugin extends Plugin {
     }, 0);
   }
 
-  private mountVisualNotesInPreview(ctx: MarkdownPostProcessorContext): void {
+  private mountVisualNotesInPreview(ctx: MarkdownPostProcessorContext, attempt = 0): void {
     const activeFile = this.app.workspace.getActiveFile();
     if (!(activeFile instanceof TFile) || activeFile.path !== ctx.sourcePath) {
       return;
@@ -185,8 +185,13 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
-    const section = leaf.view.containerEl.querySelector(".markdown-preview-section");
+    const section = leaf.view.containerEl.querySelector(
+      ".markdown-reading-view > .markdown-preview-view > .markdown-preview-sizer.markdown-preview-section",
+    );
     if (!(section instanceof HTMLElement)) {
+      if (attempt < 20) {
+        window.setTimeout(() => this.mountVisualNotesInPreview(ctx, attempt + 1), 100);
+      }
       return;
     }
 
