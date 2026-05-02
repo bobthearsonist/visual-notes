@@ -6,6 +6,11 @@
   background: var(--background-primary);
 }
 
+.markdown-source-view > .visual-notes-source-container {
+  flex: 0 0 auto;
+  margin: 0 var(--file-margins) 1rem;
+}
+
 .visual-notes-header {
   padding: 0.75rem 1rem 0.25rem;
 }
