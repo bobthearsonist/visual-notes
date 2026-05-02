@@ -137,7 +137,10 @@ your daily-notes folder.
 Commands available in the command palette:
 
 - **Visual Notes: Extract from current note** — manual extraction
-- **Visual Notes: Regenerate (force)** — discard the cached hash and re-extract
+- **Visual Notes: Regenerate (force)** — discard the cached hash + ignore `_pinned`, with a 30s per-file cooldown
+- **Visual Notes: Pin this overview** — sets `_pinned: true`; the plugin will skip auto-extraction for this note
+- **Visual Notes: Unpin this overview** — clears `_pinned`; auto-extraction resumes
+- **Visual Notes: Delete sidecar** — removes the sidecar JSON; next save auto-re-extracts
 
 ---
 

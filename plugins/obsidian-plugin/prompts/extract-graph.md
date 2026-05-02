@@ -17,8 +17,11 @@ concepts and the relationships between them.
 2. **Hierarchy encodes importance.** Central concepts have multiple
    edges; peripheral ones have one or two.
 3. **Max 30 nodes total.** If the note covers more, group related items
-   into cluster nodes labeled with a short summary like
-   `"build issues (4)"`.
+   into cluster nodes. Cluster nodes follow the standard rules:
+   - `id` is kebab-case (e.g. `build-issues`)
+   - `label` is human-readable and may contain parens, spaces, etc.
+     (e.g. `"build issues\n(4)"`)
+   The id and label are independent — apply each rule on its own field.
 4. **Semantic status colors:**
    - `completed` — finished outcomes, decisions made (rendered green)
    - `active` — in-progress work, open questions (rendered yellow)
@@ -89,6 +92,17 @@ go below their associated cluster, peripheral to the main flow.
 - Outputting positions outside reasonable canvas range (keep x in
   [0, 3000], y in [0, 1000])
 - Markdown formatting in node labels (no `**bold**`, no backticks)
+- Returning empty `nodes` or `edges` arrays. The schema permits empty
+  arrays but a blank visual is worse than a minimal one.
+
+## Sparse notes
+
+If the note contains fewer than 3 distinct concepts (e.g. a one-line
+bullet, a single sentence, or no content at all), return at minimum a
+single node representing the day's primary topic — derived from the
+first heading, the filename's date, or "Daily Overview" as a fallback.
+Better to render a single bubble that says "Brian / CDP" than nothing
+at all.
 
 ## Few-shot examples
 

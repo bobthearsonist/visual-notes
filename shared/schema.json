@@ -33,7 +33,7 @@
     "_extractedBy": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*@\\d+\\.\\d+\\.\\d+(?:[-+][\\w.-]+)?$",
-      "description": "Identifier for the producer that wrote this sidecar in <name>@<semver> format, e.g. 'obsidian-plugin@0.1.0' or 'claude-code-plugin@0.1.0-beta.1'. Useful for debugging which producer wrote a given sidecar."
+      "description": "Identifier for the producer that wrote this sidecar in <name>@<semver> format, e.g. 'obsidian-plugin@0.1.0' or 'claude-code-plugin@0.1.0-beta.1'. Useful for debugging which producer wrote a given sidecar. Note: producer IDs are unscoped — even though the npm package name is '@visual-notes/obsidian-plugin', the sidecar producer ID is just 'obsidian-plugin'. The npm scope is irrelevant for debug attribution."
     },
     "_schemaVersion": {
       "type": "string",
@@ -47,6 +47,8 @@
     },
     "nodes": {
       "type": "array",
+      "maxItems": 50,
+      "description": "Cytoscape node specs. Schema caps at 50 (the prompt's design heuristic targets 30); past that, rendering hitches and the visual stops being readable. If a note genuinely has more concepts, the LLM should cluster them into summary nodes (e.g., 'build issues (12)') rather than producing a flat list.",
       "items": {
         "type": "object",
         "required": ["data"],
@@ -76,16 +78,18 @@
             "type": "object",
             "required": ["x", "y"],
             "properties": {
-              "x": { "type": "number" },
-              "y": { "type": "number" }
+              "x": { "type": "number", "minimum": -200, "maximum": 5000 },
+              "y": { "type": "number", "minimum": -200, "maximum": 3000 }
             },
-            "description": "Pixel coordinates (LLM-assigned in v0.x; may become optional in future when force-directed layout is supported)."
+            "description": "Pixel coordinates (LLM-assigned in v0.x; may become optional in future when force-directed layout is supported). Bounded to keep rendered nodes inside Cytoscape's reasonable viewport — out-of-band positions previously caused silent off-canvas renders."
           }
         }
       }
     },
     "edges": {
       "type": "array",
+      "maxItems": 100,
+      "description": "Cytoscape edge specs. Schema caps at 100; with 50 nodes that's 2 edges per node, well above what the prompt's design heuristics produce in practice.",
       "items": {
         "type": "object",
         "required": ["data"],

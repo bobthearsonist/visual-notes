@@ -495,6 +495,16 @@ catch runaway behavior without complexity.
 - Cost dashboard. Status-bar count is sufficient.
 - Per-folder configs.
 
+**Settings migration.** `data.json` carries an internal field
+`_settingsVersion` (semver string, separate from the plugin's manifest
+version). Plugin `onload()` reads `_settingsVersion`; if the value is
+older than the current code expects, runs an idempotent migration
+function before settings are bound to the UI. The migration list is a
+chain of `(from → to)` transformations checked in declared order; each
+should be safe to re-run. v0.1 ships with `_settingsVersion: "0.1.0"`
+and an empty migration list — the convention is established before it
+becomes painful to add.
+
 ### 4.6 Sync collision handling
 
 Multi-device problem: every device running Obsidian Sync sees its own
@@ -1122,7 +1132,28 @@ override the whole prompt via settings.
 | **MarkdownRenderChild** | Obsidian lifecycle wrapper for rendered content. Each instance owns one Cytoscape canvas and is torn down when the view closes. |
 | **BRAT** | Beta Reviewers Auto-update Tool. The standard Obsidian-plugin distributor for pre-release builds. Users add a repo URL and BRAT pulls the latest tagged release. |
 
-## Appendix B — Things explicitly cut from MVP
+## Appendix B — Debugging Visual Notes
+
+For maintainers and the user when something doesn't work as expected.
+
+| Symptom | Where to look |
+|---|---|
+| Visual doesn't appear | Open DevTools (Ctrl+Shift+I in Obsidian). Filter console for `[visual-notes]`. Check for "watched folder unset", "API key invalid", or extraction errors. |
+| Visual is stale | Run `Visual Notes: Regenerate (force)` from command palette. Bypasses pin and cached hash. |
+| Visual shows wrong content | Check the sidecar: open `{date}-overview.json` next to the daily note. Is `_pinned: true`? An agent may have locked it; run `Visual Notes: Unpin this overview` then regenerate. |
+| Repeated API calls visible in status-bar count | Check that the `_lastProcessedHash` field is being written to the sidecar (look for `sha256:` prefix). If absent, the dedup is broken. |
+| Plugin loads then errors immediately | Verify `manifest.json` `minAppVersion ≤` your Obsidian version. Otherwise `getSecretStorage` may be unavailable. |
+| Extraction succeeds but render is blank | Validate the sidecar against `shared/schema.json` — possibly an unknown `kind`, malformed JSON, or out-of-bounds positions. |
+| Settings UI fields are gone after upgrade | Check `data.json` `_settingsVersion`. The migration step may have failed; restore from a backup of `data.json` (Obsidian writes `data.json.bak` on save). |
+
+The Plugin instance exposes `(window as any).__visualNotes` in dev
+builds — gives DevTools console access to the extractor, sidecar
+events, and current settings. Useful for live debugging without
+reaching for the source.
+
+---
+
+## Appendix C — Things explicitly cut from MVP
 
 These are intentional non-goals for the first release. Documenting them so
 future contributors don't relitigate.
