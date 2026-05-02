@@ -7,11 +7,14 @@ the top of the rendered note view.
 
 ## Status
 
-🚧 **Phase 1 MVP.** The plugin now includes the Obsidian build scaffold,
-settings tab, manual and watched-folder extraction, sidecar writing,
-pin/unpin/delete commands, and inline Cytoscape rendering from the sidecar.
-See [`../../docs/design.md`](../../docs/design.md) §4 for the full design
-and §9 for implementation phases.
+🚧 **MVP implementation in progress.** The plugin includes the Obsidian build
+scaffold, settings tab, manual and watched-folder extraction, sidecar writing,
+pin/unpin/delete commands, status-bar extraction count, token-usage metadata,
+and inline Cytoscape rendering from the sidecar.
+
+The top-level [`../../README.md`](../../README.md) has the product and
+architecture overview. The living [`../../docs/design.md`](../../docs/design.md)
+tracks remaining design work and open decisions.
 
 ## Install (after first release)
 
@@ -73,7 +76,8 @@ sequenceDiagram
     Plugin->>User: render Cytoscape inline
 ```
 
-See [`../../docs/design.md`](../../docs/design.md) §4.2 for the full lifecycle.
+See the architecture overview in [`../../README.md`](../../README.md) and the
+future-facing notes in [`../../docs/design.md`](../../docs/design.md).
 
 ## Cost
 
