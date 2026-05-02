@@ -62,43 +62,61 @@ typing on any device) → the plugin reacts and updates the visual.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                       The user's daily note                     │
-│                  ~/Obsidian/.../Captains Log/                   │
+│                  Daily note folder (in vault)                   │
 │                                                                 │
 │   ┌─────────────────────┐         ┌─────────────────────┐       │
 │   │  20260501.md        │         │  20260501-          │       │
-│   │  (markdown)         │◄────────│  overview.json      │       │
-│   │                     │         │  (sidecar, written  │       │
-│   │  contains an        │         │  by plugin or by    │       │
-│   │  iframe pointing    │         │  Claude Code skill) │       │
-│   │  at sibling .html   │         └────────┬────────────┘       │
+│   │  (markdown,         │         │  overview.json      │       │
+│   │  the source of      │         │  (sidecar, written  │       │
+│   │  truth for input)   │         │  by either plugin)  │       │
+│   │                     │         └─────────────────────┘       │
+│   │  Read by Obsidian   │                  ▲                    │
+│   │  plugin's file      │                  │ read at render     │
+│   │  watcher            │                  │ time + on change   │
 │   └──────────┬──────────┘                  │                    │
-│              │                             ▼                    │
-│              │                    ┌──────────────────┐          │
-│              └───────────────────►│ 20260501-        │          │
-│                                   │ overview.html    │          │
-│                                   │ (Cytoscape +     │          │
-│                                   │  graph data)     │          │
-│                                   └──────────────────┘          │
+│              │                             │                    │
+│              │ vault.on('modify')          │                    │
+│              ▼                             │                    │
+│      ┌──────────────────────────────┐      │                    │
+│      │  Obsidian plugin             │──────┘                    │
+│      │  - reads markdown            │  writes sidecar           │
+│      │  - calls Claude API          │                           │
+│      │  - mounts Cytoscape inline   │                           │
+│      │    via MarkdownPostProcessor │                           │
+│      └──────────────────────────────┘                           │
+│                                                                 │
+│  Note: the plugin never modifies the daily note (.md) itself.   │
+│  Reading-only on .md, read+write on the .json sidecar.          │
 └─────────────────────────────────────────────────────────────────┘
                 ▲                                ▲
                 │                                │
    ┌────────────┴───────────┐    ┌───────────────┴──────────────┐
    │  Obsidian plugin       │    │  Claude Code plugin           │
-   │  (this repo's primary  │    │  (this repo's secondary       │
-   │  artifact)             │    │  artifact)                    │
+   │  (primary)             │    │  (optional companion)         │
    │                        │    │                               │
    │  - Watches markdown    │    │  - Hook on `obsidian append`  │
-   │  - Calls Anthropic API │    │  - Optional skill telling     │
-   │  - Writes sidecar JSON │    │    agents to write good notes │
-   │  - Renders inline      │    │  - No longer the source of    │
-   │    Cytoscape           │    │    truth for the visual       │
+   │  - Calls Anthropic API │    │  - May write sidecar with     │
+   │  - Renders inline      │    │    `_pinned: true` to claim   │
+   │    Cytoscape via       │    │    authoritative ownership    │
+   │    MarkdownPostProc.   │    │  - Skill: design heuristics   │
+   │  - Honors `_pinned`    │    │    for agent pre-population   │
+   │    on the sidecar      │    │                               │
    └────────────────────────┘    └───────────────────────────────┘
 ```
 
 The two plugins **share a JSON schema** (defined in `shared/schema.json`) for
 the sidecar file. They do NOT need to be installed together — either alone
 suffices for the user's workflow.
+
+**Invariants** (any future contributor must preserve):
+
+1. The Obsidian plugin **only reads** the `.md` file. It writes the `.json`
+   sidecar. This avoids feedback loops with any future hook that watches
+   `.md` files.
+2. The sidecar is the **single source of truth** for visual content. Anyone
+   wanting to influence the visual writes the sidecar.
+3. `_pinned: true` on a sidecar **suppresses LLM extraction**. Treat as a
+   contract, not a hint.
 
 ### Data flow: Obsidian plugin path (primary)
 
@@ -256,39 +274,74 @@ plugins/obsidian-plugin/
 
 ### 4.3 LLM Integration
 
-**SDK:** `@anthropic-ai/sdk` (official). Bundles cleanly, gives type-safe
-`messages.parse()` for structured outputs, handles retry/backoff.
+**Transport: hand-rolled `requestUrl` against the REST endpoint.** Do NOT
+wrap the official `@anthropic-ai/sdk`. The SDK uses `fetch` internally; on
+mobile (Capacitor WebView) `fetch` is restricted by CORS. `requestUrl`
+from Obsidian is the only path that works cross-platform. Hand-rolling
+~30 lines of REST + Zod validation is simpler than monkey-patching the
+SDK's transport.
 
-**Network call:** Use `requestUrl()` from Obsidian (CORS-safe in Electron),
-not raw `fetch()`. The SDK can be wrapped to use `requestUrl` as its
-transport — see Smart Connections plugin for reference pattern.
+**Validation: `zod ^3.25.0`.** Define a `GraphSchema` (Zod) mirroring
+`shared/schema.json`; parse the response body through it. If validation
+fails, treat as a soft error (log + retry with a "your previous response
+was malformed JSON, please retry following the schema" follow-up message).
 
-**Default model:** Claude Haiku 4.5. Concept extraction from markdown is a
-pattern-matching/structural task, not deep reasoning. Cost: ~$0.006/call,
-~$2/month at 10 calls/day. Sonnet 4.6 available as a settings opt-in for
-users who want richer extraction at 3× cost.
+**API request shape (concrete):**
 
-**Structured output:** `messages.parse()` with `zodOutputFormat(GraphSchema)`.
-Forces the response to match our Zod-defined schema; type-safe consumption
-on the TypeScript side. Schema includes the same shape as `shared/schema.json`.
+```typescript
+const body = {
+  model: 'claude-haiku-4-5',          // user-configurable
+  max_tokens: 2048,
+  system: systemPrompt,                // bundled extraction prompt
+  messages: [{ role: 'user', content: markdownContent }],
+  output_config: { format: { type: 'json_schema', json_schema: graphJsonSchema } }
+};
 
-**Token budget:**
-- Pre-flight `messages.countTokens()` before sending; reject notes over
-  ~100k tokens (sanity guard).
-- Typical daily note: ~1,250-3,750 input tokens.
+const response = await requestUrl({
+  url: 'https://api.anthropic.com/v1/messages',
+  method: 'POST',
+  headers: {
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+    'content-type': 'application/json',
+  },
+  body: JSON.stringify(body),
+  throw: false,    // we handle non-2xx ourselves
+});
+```
+
+The response's `content[0].text` is the JSON string; parse + validate
+against `GraphSchema`.
+
+**Default model:** Claude Haiku 4.5. Concept extraction is a
+pattern-matching task, not deep reasoning. ~$0.006/call, ~$2-5/month at
+10 extractions/day. Sonnet 4.6 available as a settings opt-in (3× cost).
+Opus is overkill — not exposed as a default option.
+
+**Token budget pre-flight:**
+- Estimate input tokens client-side (rough char/4 heuristic) before
+  sending; reject notes over 100k tokens with a Notice.
+- Typical daily note: 1,250–3,750 input tokens.
 - System prompt: ~2,000 tokens.
-- Output: ~500-1,000 tokens.
-- Total: ~3,250-5,750 input + ~750 output per call.
+- Output: 500–1,000 tokens.
 
-**Error handling:**
-- 401 (auth) → Notice() popup, surface to user
-- 400 (bad request) → log to console, Notice() popup
-- 429 (rate limit) → silent exponential backoff, max 3 retries, then queue
-  for next manual trigger
-- 5xx / network → silent retry
-- All other → log + queue
+**Error handling (bounded retry):**
 
-No streaming. Fire-and-forget extraction; render-when-done.
+| HTTP status | Action |
+|---|---|
+| 200 | Parse + validate against Zod schema. On Zod fail, retry once with schema-correction prompt. |
+| 400 (bad request) | Log + Notice. Don't retry. |
+| 401 (auth) | Notice with "open settings" affordance. Don't retry. |
+| 429 (rate limit) | Honor `retry-after` header, exponential backoff, **max 3 retries**, then queue for next manual trigger (status-bar widget shows "queued"). |
+| 5xx | Exponential backoff, **max 3 retries**, then queue. |
+| Network failure | Treat as 5xx. |
+
+All retries respect the **AbortController** registered in `onunload()` —
+if the user disables the plugin mid-flight, in-flight requests cancel
+cleanly.
+
+**No streaming.** Fire-and-forget extraction; the JSON response is small
+enough (~750 output tokens) to render instantly when complete.
 
 ### 4.4 Rendering: Cytoscape inline
 
@@ -309,19 +362,32 @@ const theme = {
 Subscribe to `app.workspace.on('css-change')` → rebuild Cytoscape style on
 theme toggle (no re-mount needed, just `cy.style().fromJson(...).update()`).
 
-**Caching:** Static `Map<filePath, Cytoscape>` instance cache. On
-`MarkdownRenderChild.onload()`, check cache. On `onunload()`, evict.
-Avoids re-mounting the (heavy) Cytoscape instance every time the view
-re-renders.
+**Caching strategy.** Don't use a static `Map<filePath, Cytoscape>` —
+Obsidian creates multiple `MarkdownRenderChild` instances for the same
+file across split panes, hover previews, embedded references, and tab
+switches. A path-keyed singleton causes one view's `onunload()` to
+dispose a Cytoscape instance another view is using.
+
+Instead: **the Cytoscape instance lives on the `MarkdownRenderChild`**.
+Each child gets its own instance, mounted on `onload()` and disposed in
+`onunload()`. Multiple views of the same file = multiple Cytoscape
+instances; this is fine because graph data is small and instance
+construction is fast (~tens of ms).
+
+If profiling later shows this is too expensive, fall back to a
+`WeakMap` keyed by the container element — but only if measurement
+demands it.
 
 **Sidecar reload:** When the sidecar JSON is rewritten by extraction,
-load the new graph data into the cached Cytoscape instance via
-`cy.json({ elements: { ... } })`. No HTML regeneration, no iframe
-reload — just a Cytoscape data update.
+notify all live `MarkdownRenderChild` instances watching that file via
+a shared event-emitter. Each instance loads the new graph data into its
+own Cytoscape via `cy.json({ elements: { ... } })`. No remount, no
+flicker — just a data update.
 
 **Why not iframe?** The legacy approach used a `file://` iframe with a
 self-contained HTML file. Inside a plugin, we own the renderer — direct
-Cytoscape mount is simpler, faster, theme-integrated, no sandbox concerns.
+Cytoscape mount is simpler, faster, theme-integrated, no sandbox
+concerns. The iframe path is dropped in v0.1.
 
 ### 4.5 Settings UI
 
@@ -330,12 +396,34 @@ Minimum viable. `PluginSettingTab` with these fields:
 | Setting | Type | Default | Storage |
 |---|---|---|---|
 | Anthropic API key | text (password style) | empty | SecretStorage on desktop, data.json on mobile (with warning) |
-| Watched folder | text | `0 Profisee/Captains Log` | data.json |
+| Watched folder | text | **empty** (forces explicit config) | data.json |
 | Debounce (ms) | number | 1500 | data.json |
-| Model | dropdown (Haiku/Sonnet/Opus) | Haiku 4.5 | data.json |
-| Custom prompt override | textarea, hidden behind a "show advanced" toggle | empty (uses bundled `prompts/extract-graph.md`) | data.json |
+| Model | dropdown (Haiku 4.5 / Sonnet 4.6) | Haiku 4.5 | data.json |
 
-That's it. No cost UI, no per-folder configs, no model-comparison panel.
+The "Watched folder" default is **deliberately empty**. The plugin stays
+inert until the user points it at their daily-notes folder. On plugin
+load, if the folder is empty AND the API key is set, surface a one-time
+Notice: "Visual Notes: set a watched folder in Settings to enable
+extraction."
+
+**Command palette entries** (always available):
+
+| Command | Behavior |
+|---|---|
+| `Visual Notes: Extract from current note` | Manual extraction. Bypasses debounce, runs immediately. Useful for "the visual is stale, force it." |
+| `Visual Notes: Regenerate (force)` | Same as above but discards the cached `_lastProcessedHash` first. Useful when the LLM produced a bad graph and you want a fresh attempt. |
+| `Visual Notes: Delete sidecar` | Removes the sidecar JSON (and the rendered visual). Escape hatch. |
+
+**Status bar:** A small indicator showing today's extraction count and a
+spinner during in-flight calls ("Visual Notes: extracting…"). Replaces a
+full cost-tracking dashboard for v0.1; gives users enough visibility to
+catch runaway behavior without complexity.
+
+**Cut from MVP:**
+- Custom prompt override (textarea). Premature on day 1; users haven't
+  yet hit cases where the bundled prompt fails them.
+- Cost dashboard. Status-bar count is sufficient.
+- Per-folder configs.
 
 ### 4.6 Sync collision handling
 
@@ -356,9 +444,26 @@ result._lastProcessedHash = hash;
 await writeSidecar(notePath, result);
 ```
 
-This solves the most common sync race. Concurrent extraction from two
-devices simultaneously is still possible but rare; last-writer-wins on
-the sidecar is acceptable.
+This solves the most common sync race. Two narrower windows remain:
+
+**Mid-flight race:** Device A starts extraction at T=0; device B
+receives the same markdown via Sync at T=0.5; B's hash check sees no
+sidecar yet (A hasn't written) → B starts a duplicate extraction. Both
+write sidecars; last-writer-wins, but the user paid the API call twice.
+
+Mitigation (deferred to Phase 6, documented as known limitation here):
+write a `.lock` placeholder sidecar before the API call (atomic rename
+on completion). Or use a content-addressed-temp-file + rename pattern.
+
+**Concurrent edits across devices:** Device A and B both edit a daily
+note simultaneously while offline; Obsidian Sync resolves the markdown
+conflict; both devices then trigger extraction on the merged result. In
+practice this manifests as one extra API call (the second device sees
+its own merged hash mismatch the first device's sidecar). Acceptable
+for v0.1.
+
+**Document as known limitation in the README + plugin settings help
+text.** No data corruption, just occasional duplicate API spend.
 
 ---
 
@@ -401,10 +506,25 @@ OR (alternative ordering):
 2. Claude Code hook fires, agent writes sidecar with curated graph
 3. Obsidian's debounced extraction triggers next, overwrites with LLM view
 
-**Last writer wins** is acceptable because both producers target the same
-schema and both are deterministic. If the user wants the agent's curated
-graph to stick, they can disable the Obsidian extraction for specific notes
-via a `_pinned: true` field in the sidecar (future feature).
+**Last writer wins WITH a `_pinned` escape hatch (v0.1, not deferred).**
+Both producers target the same schema. The Obsidian plugin honors
+`_pinned: true` on read: if the existing sidecar has `_pinned: true`,
+the plugin skips its own extraction and respects the existing data.
+
+This protects deliberate, curated agent-authored graphs from being
+silently overwritten by probabilistic LLM extraction. Without `_pinned`,
+the design ships data loss as a feature — unacceptable.
+
+Implementation cost: ~5 lines in the Obsidian plugin's
+`shouldSkipExtraction()` check. Deferring it to a "future feature" was
+called out by the architecture review as ship-blocking; landing it on
+day 1.
+
+**Default behavior:** the Claude Code plugin's hook does NOT
+automatically set `_pinned`. The agent has to choose to pin a sidecar
+explicitly when it wants its content to be authoritative. This avoids
+surprising the user when they install both plugins and lose the
+LLM-extraction behavior they signed up for.
 
 ### 5.3 Migration path
 
@@ -514,12 +634,17 @@ the examples first when extraction quality is off.
 Cytoscape rendered with **Catppuccin** color palette (Latte for light,
 Mocha for dark). Theme variables read from Obsidian's CSS at mount time.
 
-| Status | Light bg | Light border | Dark bg | Dark border |
+| Status | Latte (light) bg | Latte border | Mocha (dark) bg | Mocha border |
 |---|---|---|---|---|
-| `completed` | `#a6e3a1` | `#40a02b` | (mocha greens) | |
-| `active` | `#f9e2af` | `#df8e1d` | (mocha yellows) | |
-| `context` | `#89b4fa` | `#1e66f5` | (mocha blues) | |
-| `blocked` | `#f38ba8` | `#d20f39` | (mocha reds) | |
+| `completed` | `#a6e3a1` | `#40a02b` | `#a6e3a1` | `#94e2d5` |
+| `active` | `#f9e2af` | `#df8e1d` | `#f9e2af` | `#fab387` |
+| `context` | `#89b4fa` | `#1e66f5` | `#89b4fa` | `#74c7ec` |
+| `blocked` | `#f38ba8` | `#d20f39` | `#f38ba8` | `#eba0ac` |
+
+Status fill colors stay the same across themes (Catppuccin's accent
+palette is consistent); the page background, text, and borders shift
+between Latte and Mocha. Read all values from Obsidian's CSS variables
+at mount time — don't hardcode in the plugin.
 
 ### Shapes
 
@@ -544,11 +669,28 @@ position nodes; LLM only produces structure). Decision deferred — see §10.
 
 ### Interactivity
 
-- Mouse hover on a node → bold border, highlight all connected edges
-- Mouse out → restore default
-- Pan with click-drag, zoom with wheel
-- No node-drag (preset layout is authoritative)
+- **Click a node → scroll the markdown to the related section.** This is
+  the killer interaction for journal use — turns the visual into a
+  navigation aid, not just decoration. Implementation: each node's
+  `data.id` is also a search key into the markdown (`# heading slug` or
+  `==highlighted text==` match). On click, scroll the open note's editor
+  to the first match.
+- **Hover** on a node → bold border, highlight all connected edges
+- **Mouse out** → restore default
+- **Pan** with click-drag, **zoom** with wheel/pinch (touch on mobile)
+- **No node-drag.** Preset layout is authoritative; users who don't like
+  positioning fix the markdown, not the visual.
 - Min zoom 0.3, max zoom 3.0
+- Keyboard: `f` fits viewport to graph, `r` resets zoom
+
+### Mobile-specific
+
+- Cytoscape canvas height: 350px on phones (vs. 450px on desktop) to
+  preserve note-text real estate on narrow viewports.
+- Touch gestures: pinch-zoom + drag-pan. No hover; tap a node for the
+  jump-to-section behavior.
+- Settings page: avoid horizontal layouts; vertical stack of text inputs.
+  The "Advanced" disclosure stays collapsed by default on mobile.
 
 ### Header
 
@@ -653,15 +795,28 @@ distinguishes:
 
 ## 9. Implementation Phases
 
-### Phase 1 — Scaffold + Obsidian plugin MVP (week 1)
+### Phase 1 — Scaffold + Obsidian plugin MVP (1.5–2 weeks)
 
-- Repo scaffolded (this commit)
-- Obsidian plugin skeleton: manifest, esbuild, plugin entry that registers
-  a no-op MarkdownPostProcessor and PluginSettingTab
+Budget honestly: this is a fresh TypeScript Obsidian plugin with esbuild,
+zod, an external API integration, and inline-rendered Cytoscape. A week
+is doable for someone who's shipped Obsidian plugins before; budget 1.5–2
+weeks otherwise.
+
+- Repo scaffolded ✅ (initial commit landed)
+- Copy `esbuild.config.mjs`, `tsconfig.json`, `version-bump.mjs`,
+  `versions.json`, `styles.css` from
+  [obsidian-sample-plugin](https://github.com/obsidianmd/obsidian-sample-plugin).
+  Don't reinvent.
+- Obsidian plugin skeleton: manifest, plugin entry that registers a
+  no-op `MarkdownPostProcessor` and `PluginSettingTab`
 - Settings tab with API key field (plaintext, no SecretStorage yet)
-- Manual command: "Visual Notes: Extract from current note" via the
-  command palette. No file-watching, no debouncing.
-- Anthropic SDK call → write sidecar JSON
+- Generate `src/schema.ts` from `shared/schema.json` via
+  `json-schema-to-typescript`
+- Manual command: `Visual Notes: Extract from current note`. No
+  file-watching, no debouncing yet.
+- `extractor.ts`: hand-rolled `requestUrl` to Anthropic Messages API,
+  Zod-validate response
+- Write sidecar JSON next to the note
 - Verify happy path on one daily note end-to-end
 
 ### Phase 2 — Auto-extraction + rendering (week 2)
@@ -698,6 +853,63 @@ distinguishes:
 - Cost-tracking widget (optional, originally cut from MVP)
 - Multi-vault config
 - More few-shot prompt examples
+
+---
+
+## 9b. Failure modes & lifecycle states
+
+Every external dependency can fail; designing for it up front is cheaper
+than debugging in the wild.
+
+### Lifecycle state machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Debouncing: vault.modify (md file in scope)
+    Debouncing --> Debouncing: another modify resets timer
+    Debouncing --> Hashing: 1.5s elapsed
+    Hashing --> Idle: hash matches sidecar._lastProcessedHash
+    Hashing --> CheckPin: hash differs OR no sidecar
+    CheckPin --> Idle: sidecar._pinned == true
+    CheckPin --> Extracting: not pinned
+    Extracting --> Writing: 200 OK + Zod-valid
+    Extracting --> Extracting: Zod fail (1 retry with correction)
+    Extracting --> Queued: 429 / 5xx (with backoff, max 3)
+    Extracting --> Failed: 401 / 400 (terminal)
+    Extracting --> Idle: AbortController fired (plugin unload)
+    Queued --> Extracting: backoff timer
+    Queued --> Failed: 3 retries exhausted
+    Writing --> Idle: sidecar written, render triggered
+    Failed --> Idle: user dismisses Notice or fixes config
+```
+
+### Failure scenarios + handling
+
+| Scenario | Handling |
+|---|---|
+| **API key missing** on plugin load | Status-bar shows "Visual Notes: configure API key". File watcher stays inert. |
+| **Watched folder unset** on plugin load | Status-bar shows "Visual Notes: set watched folder". One-time Notice on first load. |
+| **Watched folder doesn't exist** | Notice on plugin load. File watcher inert until folder exists. |
+| **Anthropic API down** (5xx) | Bounded retry (3×, exponential backoff). On exhaustion, queue for next manual trigger; status-bar shows "queued". |
+| **Network failure** (no internet) | Treated as 5xx. Same retry/queue behavior. |
+| **Rate limit** (429) | Honor `retry-after`, exponential backoff, max 3 retries. |
+| **Auth failure** (401) | Notice with "open settings" affordance. Don't retry. |
+| **Bad request** (400) | Log to console, Notice. Suggests model/prompt issue; don't retry. |
+| **Malformed response from API** (Zod-invalid JSON) | One retry with schema-correction prompt. Then fail. |
+| **Sidecar JSON malformed** (someone wrote bad JSON) | Renderer logs the error, displays a "⚠ malformed sidecar" placeholder in the note. Does NOT crash the post-processor. |
+| **Daily note deleted mid-flight** | Catch the `vault.modify()` error on sidecar write; discard result silently. |
+| **Sidecar exists but markdown doesn't** (orphaned) | Renderer shows the visual as-is (data is still valid). User can manually delete via the "Delete sidecar" command. |
+| **Plugin disabled mid-flight** | `AbortController.abort()` in `onunload()` cancels the in-flight `requestUrl`. No write happens. |
+| **Two views of same file open** | Each `MarkdownRenderChild` owns its own Cytoscape instance. No cache collision. |
+| **Obsidian Sync delivers sidecar mid-extraction** | Hash check at extraction completion; if the just-arrived sidecar's hash matches what we just extracted, no-op. |
+
+### What we explicitly DON'T handle in v0.1
+
+- Multi-vault settings divergence (Obsidian vault model is per-vault by default)
+- Recovery from a corrupted plugin `data.json` (Obsidian re-creates from defaults)
+- API key rotation mid-session (user restarts plugin or Obsidian)
+- LLM hallucination of nonsense graphs (manual `Regenerate (force)` is the escape hatch)
 
 ---
 
@@ -804,10 +1016,12 @@ override the whole prompt via settings.
 | Term | Meaning |
 |---|---|
 | **Sidecar** | The `{date}-overview.json` file that lives next to the daily note, holding the extracted graph data. |
-| **Watched folder** | The Obsidian folder the plugin monitors for daily-note changes. Default: `0 Profisee/Captains Log`. |
+| **Watched folder** | The Obsidian folder the plugin monitors for daily-note changes. Empty by default; user must configure. |
 | **Daily note** | A markdown file named `YYYYMMDD.md` in the watched folder. |
 | **Overview** | The visual concept map rendered for a daily note. |
-| **Session** (legacy) | Per-conversation whiteboard `{date}-session-{n}.json` from the original visual-notes skill. May or may not be carried forward in v0.1. |
+| **Session-whiteboard** (legacy) | Per-conversation `{date}-session-{n}.json` sidecars from the original visual-notes skill. **Note:** "session" elsewhere in this doc refers to a conversational unit (an "AI session summary" in a daily note). When ambiguous, use "session-whiteboard" for the file format and "session summary" or "conversation" for the content unit. |
+| **Producer** | Any code that writes a sidecar. The Obsidian plugin and the Claude Code plugin are the two producers. |
+| **`_pinned`** | A boolean field in the sidecar that, when `true`, suppresses LLM extraction by the Obsidian plugin. Used by the Claude Code plugin to claim authoritative ownership of a sidecar. |
 
 ## Appendix B — Things explicitly cut from MVP
 

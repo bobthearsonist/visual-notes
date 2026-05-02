@@ -7,6 +7,12 @@
   "required": ["nodes", "edges"],
   "additionalProperties": false,
   "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["daily-overview", "session-whiteboard", "rollup"],
+      "default": "daily-overview",
+      "description": "Discriminates between sidecar variants. v0.1 only renders 'daily-overview'; the other values are reserved for future expansion (per-conversation whiteboards, weekly retros, etc.) so we don't have to fork the schema later."
+    },
     "title": {
       "type": "string",
       "description": "Visual title (window title equivalent). Auto-derived from filename + date when omitted."
@@ -22,11 +28,12 @@
     "_lastProcessedHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the markdown body the sidecar was extracted from. Used to skip redundant API calls when the markdown hasn't changed (handles Obsidian Sync's per-device modify storm)."
+      "description": "SHA-256 hash of the markdown body the sidecar was extracted from. Format: 'sha256:' prefix + 64 lowercase hex chars (matches Node's `crypto.createHash('sha256').digest('hex')` output WITH the 'sha256:' literal prefix prepended). Used to skip redundant API calls when the markdown hasn't changed (handles Obsidian Sync's per-device modify storm)."
     },
     "_extractedBy": {
       "type": "string",
-      "description": "Identifier for the producer that wrote this sidecar, e.g. 'obsidian-plugin@0.1.0' or 'claude-code-plugin@0.1.0'. Useful for debugging which producer wrote a given sidecar."
+      "pattern": "^[a-z][a-z0-9-]*@\\d+\\.\\d+\\.\\d+(?:[-+][\\w.-]+)?$",
+      "description": "Identifier for the producer that wrote this sidecar in <name>@<semver> format, e.g. 'obsidian-plugin@0.1.0' or 'claude-code-plugin@0.1.0-beta.1'. Useful for debugging which producer wrote a given sidecar."
     },
     "_schemaVersion": {
       "type": "string",
@@ -35,7 +42,8 @@
     },
     "_pinned": {
       "type": "boolean",
-      "description": "When true, suppresses automatic re-extraction by the Obsidian plugin. Future feature; useful when the user wants to keep an agent-curated sidecar from being overwritten by LLM extraction."
+      "default": false,
+      "description": "When true, suppresses automatic re-extraction by the Obsidian plugin. The Claude Code plugin sets this to claim authoritative ownership of the sidecar (deliberate, curated content); the Obsidian plugin honors it on read. Land this in v0.1, not deferred to a future release."
     },
     "nodes": {
       "type": "array",

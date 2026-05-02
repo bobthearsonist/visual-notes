@@ -2,96 +2,173 @@
 
 > A living concept map of your day, generated from your Obsidian daily notes.
 
-Visual Notes watches your daily-note markdown, extracts the day's concepts and
-relationships via an LLM, and renders an interactive graph at the top of the
-note. The visual reflects **everything in the file** — AI session summaries,
-manual notes, mobile edits, content from any source — not just what one
-specific tool put there.
+You write in your daily note. Visual Notes reads it, extracts the day's
+concepts and how they connect, and renders an interactive graph at the
+top of the note — refreshed automatically as you write.
 
-The repository ships **two plugins** that share a JSON sidecar schema:
+It captures **everything in the file** — AI session summaries, manually
+typed notes, mobile edits, content from any source. The markdown is the
+universal interface; whatever lands there ends up in the visual.
 
-1. **Obsidian plugin** (TypeScript) — primary artifact. Watches files, calls
-   the Claude API, renders Cytoscape inline. Cross-platform (desktop + mobile),
-   independent of any AI client.
-2. **Claude Code plugin** (markdown + bash) — secondary. A hook + skill that
-   nudges AI agents to write good session summaries; lets the agent
-   pre-populate the sidecar before the LLM extraction overwrites it.
+```
+                       ┌─────────────────────────────────┐
+                       │        20260501-overview.html   │
+                       │                                 │
+                       │   ┌─[hook fix]──┐               │
+                       │   │             ▼               │
+                       │   │      ┌─────────────┐        │
+                       │   │      │ matcher/if  │        │
+                       │   │      │   split     │        │
+                       │   │      └──────┬──────┘        │
+                       │   │             │ powers        │
+                       │   │             ▼               │
+                       │   │      ┌─────────────┐        │
+                       │   │      │ PostToolUse │        │
+                       │   │      │    hook     │ ◄──┐   │
+                       │   │      └─────────────┘    │   │
+                       │   │                         │   │
+                       │   │  ┌──[Brian's CDP]──┐    │   │
+                       │   │  ▼                 │    │   │
+                       │   │  ◇ context     ─ ─ ┘    │   │
+                       │   │                         │   │
+                       │   └──── (cross-domain)──────┘   │
+                       │              dashed             │
+                       └─────────────────────────────────┘
+                            inline at top of daily note
+```
+
+*(Above: stylized representation of an actual rendered overview. Real output
+uses Catppuccin colors; rectangles for systems, ellipses for tasks, diamonds
+for decisions; thick edges for strong relationships, dashed for cross-domain.)*
+
+---
+
+## What this is
+
+The repo houses **two plugins** that share a JSON sidecar schema:
+
+| Plugin | What it does | Required? |
+|---|---|---|
+| **Obsidian plugin** (TypeScript) | Watches markdown, calls Claude API, renders Cytoscape inline | Yes (primary artifact) |
+| **Claude Code plugin** (markdown + bash) | Lets AI agents pre-populate the sidecar before LLM extraction runs | Optional |
 
 Either plugin works alone. They compose if you have both.
 
 ---
 
-## Architecture overview
+## How it works (concept)
 
-```
-                                ┌──────────────────────────────────┐
-                                │         Daily Note (.md)         │
-                                │  YYYYMMDD.md in watched folder   │
-                                └─────┬───────────────────────┬────┘
-                                      │ writes                │ embeds iframe
-                                      │ via various paths     │
-                                      ▼                       │
-                ┌──────────────────────────────────────┐      │
-   manual ─────►│                                      │      │
-   typing       │                                      │      │
-                │             Markdown body            │      │
-   AI agent ───►│      (the universal interface)       │      │
-   (any client) │                                      │      │
-                │                                      │      │
-   sync from ──►└──────────────────────────────────────┘      │
-   another                       │                            │
-   device                         │ vault.on('modify')        │
-                                  ▼                           │
-                       ┌──────────────────────┐               │
-                       │  OBSIDIAN PLUGIN     │               │
-                       │  ─────────────────   │               │
-                       │  watcher → debounce  │               │
-                       │  → hash-check        │               │
-                       │  → Claude API        │               │
-                       │  → write sidecar     │               │
-                       │  → trigger render    │               │
-                       └─────────┬────────────┘               │
-                                 │                            │
-                                 ▼                            │
-                       ┌──────────────────────┐               │
-                       │  Sidecar (JSON)      │               │
-                       │  {date}-overview.json│◄──────────────┤
-                       │                      │               │
-                       │  shared schema       │               │
-                       └─────────┬────────────┘               │
-                                 │                            │
-                                 │ MarkdownPostProcessor      │
-                                 │ reads + mounts Cytoscape   │
-                                 ▼                            │
-                       ┌──────────────────────┐               │
-                       │  Cytoscape canvas    │───────────────┘
-                       │  (rendered inline)   │
-                       └──────────────────────┘
+```mermaid
+flowchart LR
+    subgraph Sources["Anything that edits the note"]
+        A1[Claude Code]
+        A2[claude.ai mobile/web]
+        A3[Manual typing]
+        A4[Obsidian Sync<br/>from another device]
+    end
+    Note[("Daily note<br/>YYYYMMDD.md")]
+    Plugin[Obsidian plugin]
+    API((Claude<br/>API))
+    Side[("YYYYMMDD-overview.json<br/>sidecar")]
+    Viz["Concept map<br/>rendered inline"]
+
+    Sources --> Note
+    Note -->|on save| Plugin
+    Plugin -->|markdown content| API
+    API -->|graph JSON| Plugin
+    Plugin --> Side
+    Side --> Viz
+    Viz -. embedded in .-> Note
 ```
 
-### Data flow (Obsidian plugin path)
+The thesis: **the markdown file is the universal interface**. Anything that
+edits it triggers the plugin; the visual reflects whatever lands in the
+file, regardless of who wrote it.
+
+---
+
+## Install
+
+### For Obsidian users (recommended path)
+
+```
+1. Install BRAT in Obsidian
+2. In BRAT settings, add:  bobthearsonist/visual-notes
+3. Open Visual Notes settings, paste your Anthropic API key
+4. Set "Watched folder" to your daily-notes folder
+5. Edit a daily note → visual appears at the top
+```
+
+Full instructions: [`plugins/obsidian-plugin/README.md`](plugins/obsidian-plugin/README.md).
+
+### For Claude Code users (optional companion)
+
+```
+/plugin install bobthearsonist/visual-notes/plugins/claude-code-plugin
+```
+
+Full instructions: [`plugins/claude-code-plugin/README.md`](plugins/claude-code-plugin/README.md).
+
+---
+
+## Settings
+
+```
+┌─ Visual Notes ─────────────────────────────────────┐
+│                                                    │
+│  Anthropic API key   [••••••••••••••••]    [Show]  │
+│                                                    │
+│  Watched folder      [                       ]     │
+│                      ⚠ Required. Empty = inactive  │
+│                                                    │
+│  Debounce (ms)       [1500          ]              │
+│                                                    │
+│  Model               [Haiku 4.5            ▼]      │
+│                                                    │
+│  ▶ Advanced (custom prompt, debug logging…)        │
+│                                                    │
+└────────────────────────────────────────────────────┘
+```
+
+Five settings. Defaults are conservative; the "Watched folder" is
+intentionally empty so the plugin stays inert until you point it at
+your daily-notes folder.
+
+Commands available in the command palette:
+
+- **Visual Notes: Extract from current note** — manual extraction
+- **Visual Notes: Regenerate (force)** — discard the cached hash and re-extract
+
+---
+
+## Detailed architecture
+
+The high-level flow above hides the lifecycle. Here's the full pipeline:
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant User
     participant Vault as Obsidian Vault
-    participant Plugin as Obsidian Plugin
+    participant Plugin as Visual Notes plugin
     participant API as Anthropic API
-    participant View as Markdown View
+    participant View as Markdown view
 
-    User->>Vault: save daily note
+    User->>Vault: save daily note (Cmd-S, idle save, etc.)
     Vault->>Plugin: vault.on('modify')
-    Plugin->>Plugin: debounce 1.5s
-    Plugin->>Plugin: hash markdown body
-    Plugin->>Vault: read sidecar (if exists)
+    Plugin->>Plugin: debounce 1.5s (configurable)
+    Plugin->>Plugin: SHA-256 the markdown body
+    Plugin->>Vault: read existing sidecar (if any)
     alt hash matches sidecar._lastProcessedHash
-        Plugin->>Plugin: skip (already extracted)
-    else hash differs or no sidecar
-        Plugin->>API: messages.parse({ system, user, schema })
+        Plugin->>Plugin: skip — already extracted
+    else hash differs OR no sidecar
+        Plugin->>View: status-bar: "Visual Notes: extracting…"
+        Plugin->>API: messages.parse({system, user, output_config})
         API-->>Plugin: structured JSON {nodes, edges, ...}
         Plugin->>Vault: write {date}-overview.json
         Vault->>View: trigger MarkdownPostProcessor refresh
-        View->>View: mount/update Cytoscape from sidecar
+        View->>View: load sidecar → mount/update Cytoscape
+        Plugin->>View: status-bar: clear
         View-->>User: rendered concept map
     end
 ```
@@ -99,48 +176,47 @@ sequenceDiagram
 ### Component boundaries
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       visual-notes/                              │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  shared/                                                 │    │
-│  │    schema.json    (JSON Schema — sidecar contract)       │    │
-│  │  Consumed by both plugins                                │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│              ▲                              ▲                    │
-│              │                              │                    │
-│  ┌───────────┴──────────────┐  ┌────────────┴───────────────┐   │
-│  │ plugins/                 │  │ plugins/                   │   │
-│  │   claude-code-plugin/    │  │   obsidian-plugin/         │   │
-│  │                          │  │                            │   │
-│  │ - hooks/                 │  │ - src/main.ts              │   │
-│  │   - hooks.json           │  │ - src/extractor.ts         │   │
-│  │   - run-hook.sh          │  │ - src/renderer.ts          │   │
-│  │   - post-obsidian-       │  │ - src/settings.ts          │   │
-│  │     append.md            │  │ - src/theme.ts             │   │
-│  │ - skills/visual-notes/   │  │ - src/storage.ts           │   │
-│  │   - SKILL.md             │  │ - prompts/                 │   │
-│  │                          │  │   - extract-graph.md       │   │
-│  │ TypeScript: none         │  │ - manifest.json            │   │
-│  │ Distribution: marketplace│  │ - package.json             │   │
-│  └──────────────────────────┘  │ Distribution: BRAT or      │   │
-│                                │   community plugin store   │   │
-│                                └────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                        visual-notes/                           │
+│                                                                │
+│            ┌─────────────────────────────┐                     │
+│            │         shared/             │                     │
+│            │       schema.json           │                     │
+│            │  (the contract: nodes,      │                     │
+│            │   edges, status, kind…)     │                     │
+│            └──────┬──────────────┬───────┘                     │
+│                   │ consumed by  │                             │
+│       ┌───────────┘              └─────────────┐               │
+│       ▼                                        ▼               │
+│  ┌─────────────────────┐         ┌──────────────────────┐      │
+│  │  Obsidian plugin    │         │  Claude Code plugin  │      │
+│  │  (TypeScript)       │         │  (markdown + bash)   │      │
+│  │                     │         │                      │      │
+│  │  PRIMARY            │         │  OPTIONAL            │      │
+│  │                     │         │                      │      │
+│  │  Distribution:      │         │  Distribution:       │      │
+│  │  community store /  │         │  /plugin install …   │      │
+│  │  BRAT               │         │                      │      │
+│  └─────────────────────┘         └──────────────────────┘      │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
----
+The two plugins do NOT depend on each other. Either alone provides full
+functionality; both together compose with **last-writer-wins** sidecar
+semantics, escape-hatched via `_pinned: true` (see [§5.2 of the design
+doc](docs/design.md#52-coexistence-with-obsidian-plugin)).
 
-## Repository layout
+### Repository layout
 
 ```
 visual-notes/
-├── README.md              # this file
-├── LICENSE                # MIT
+├── README.md                         # this file
+├── LICENSE                           # MIT
 ├── docs/
-│   └── design.md          # full design document → start here
+│   └── design.md                     # full design — start here for contributing
 ├── shared/
-│   └── schema.json        # sidecar JSON schema (the contract)
+│   └── schema.json                   # the JSON Schema contract
 └── plugins/
     ├── claude-code-plugin/
     │   ├── README.md
@@ -151,81 +227,40 @@ visual-notes/
         ├── README.md
         ├── manifest.json
         ├── package.json
-        ├── src/
         ├── prompts/
-        └── templates/
+        │   └── extract-graph.md
+        └── src/
 ```
 
 ---
 
-## Install
+## Coexistence: when both plugins are installed
 
-### For Obsidian users (recommended)
-
-The Obsidian plugin is the primary way to use Visual Notes — it works
-regardless of what AI tools you use to write your notes.
-
-**Beta channel (BRAT):**
-1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) in Obsidian.
-2. In BRAT settings, add this repository:
-   `https://github.com/bobthearsonist/visual-notes`
-3. BRAT will install the Obsidian plugin.
-4. In Visual Notes settings: paste your Anthropic API key, set the watched
-   folder, save.
-5. Edit a daily note → the visual appears at the top.
-
-**Community plugin store** (after first stable release): search for "Visual
-Notes" in Obsidian's settings → Community plugins.
-
-See [`plugins/obsidian-plugin/README.md`](plugins/obsidian-plugin/README.md) for details.
-
-### For Claude Code users
-
-The Claude Code plugin adds a hook that lets AI agents pre-populate the
-sidecar before the Obsidian plugin's auto-extraction runs. Useful if you
-want agent-curated graph nodes for specific sessions.
+If you install both, here's what happens:
 
 ```
-/plugin install bobthearsonist/visual-notes/plugins/claude-code-plugin
+agent appends session summary to daily note
+         │
+         │ Bash hook fires
+         ▼
+  agent writes curated sidecar  ── _pinned: true (sticky) ──┐
+         │                                                  │
+         │ 1.5s debounce                                    │
+         ▼                                                  │
+   Obsidian plugin's file watcher                           │
+         │                                                  │
+         ├─ check sidecar: is _pinned: true? ───────────────┤
+         │                                                  │
+         │  yes (from agent)         no                     │
+         │     │                     │                      │
+         │     ▼                     ▼                      │
+         │   skip extraction    extract via Claude API ──> overwrite sidecar
 ```
 
-See [`plugins/claude-code-plugin/README.md`](plugins/claude-code-plugin/README.md) for details.
-
----
-
-## How extraction works (visually)
-
-```
-Daily note markdown                    LLM extraction                 Rendered graph
-──────────────────                     ──────────────                 ───────────────
-                                                                  ┌─ ┌──────────┐
- # Today                                                           │  │ "matcher │
-                                                                   │  │  bug"    │ ──┐
- ## AI Session - hook fix                                          │  └──────────┘   │
- - [x] diagnosed matcher           ┌──────────────────┐            │       │ "fixed │
-   field misuse                     │  Claude Haiku    │            │       │ by"    │
- - [x] fixed matcher / if split  ──►│  extraction      │ ──► JSON ──┤       ▼        │
-                                    │  prompt + zod    │             │  ┌──────────┐ │
- ## Brian / CDP                     │  schema          │             │  │ "matcher/│ │
- Discussion about CDP updates,      └──────────────────┘             │  │  if split│ │
- next steps for integration                                          │  └──────────┘ │
-                                                                     │       │       │
- ## Notes                                                            │       ▼       │
- - filed feedback re: hook                                           │  ┌──────────┐ │
-   linter idea                                                       │  │"PostTool │ │
-                                                                     └─►│ Use hook"│ │
-                                                                        └──────────┘ │
-                                                                              ▲      │
-                                                                              └──────┘
-                                                                       (interactive,
-                                                                        zoomable,
-                                                                        themed)
-```
-
-Status colors (green/yellow/blue/red), shapes (rectangle/ellipse/diamond),
-and edge weights (thick/thin/dashed) are all set by the LLM following the
-extraction prompt's design heuristics. See [`docs/design.md`](docs/design.md) §6 for the
-full prompt and §7 for the visual style spec.
+The agent path is **deliberate, curated** content. The plugin path is
+**LLM extraction** of whatever's in the file. `_pinned` lets the agent
+say "I'm authoritative; don't overwrite me." Without it, the plugin's
+extraction always wins eventually (last-writer-wins).
 
 ---
 
@@ -233,26 +268,53 @@ full prompt and §7 for the visual style spec.
 
 | Component | Status |
 |---|---|
-| Design doc | ✅ Complete (this commit) |
-| Repo scaffold | ✅ Complete (this commit) |
+| Design doc | ✅ Complete (see `docs/design.md`) |
+| Repo scaffold | ✅ Complete |
+| Sidecar schema | ✅ Defined (`shared/schema.json`) |
 | Obsidian plugin | 🚧 Phase 1 — scaffold only |
-| Claude Code plugin | 🚧 Migration pending (existing implementation lives in private dotfiles repo) |
-| Shared schema | ✅ Defined (`shared/schema.json`) |
+| Claude Code plugin | 🚧 Migration pending from private dotfiles repo |
 | Distribution | ⏳ Awaiting first release |
+
+---
+
+## Cost expectations
+
+The Obsidian plugin sends the full markdown content of a daily note to
+Anthropic's API on every (debounced, deduped) save. At default settings
+(Claude Haiku 4.5, 1.5s debounce):
+
+- **~$0.006 per extraction**
+- Typical day: 5–15 extractions
+- Monthly cost: **~$2–5**
+
+Bring your own API key. The plugin does not proxy or aggregate usage.
+
+A status-bar indicator shows today's extraction count so you can spot
+runaway behavior without a full dashboard.
+
+---
+
+## Privacy
+
+The plugin sends the **full content** of your daily note to the Claude
+API for extraction. By default Anthropic does not retain content beyond
+the request lifetime, but read [their privacy
+policy](https://www.anthropic.com/legal/privacy). Don't put sensitive
+content in the watched folder.
 
 ---
 
 ## Contributing
 
-This repo is in design phase. The full design lives in
-[`docs/design.md`](docs/design.md) — read it before opening issues or PRs.
+This repo is in design phase. Read [`docs/design.md`](docs/design.md)
+before opening issues or PRs.
 
-- Architecture decisions: see `docs/design.md` §10 (Open Questions)
-- Patterns to follow: see `docs/design.md` §4-7
-- Implementation phases: see `docs/design.md` §9
+- **Architecture decisions:** see `docs/design.md` §10 (Open Questions)
+- **Patterns to follow:** see `docs/design.md` §4–7
+- **Implementation phases:** see `docs/design.md` §9
 
-Major design changes should be proposed via PR to `docs/design.md` and any
-new ADRs in `docs/decisions/`.
+Major design changes go via PR to `docs/design.md`. Decisions get an
+ADR-style record under `docs/decisions/`.
 
 ---
 

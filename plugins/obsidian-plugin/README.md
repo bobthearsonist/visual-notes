@@ -43,7 +43,7 @@ After install, open Settings → Visual Notes:
 | Setting | What it does |
 |---|---|
 | **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in OS keychain on desktop, plaintext `data.json` on mobile (with warning). |
-| **Watched folder** | The folder containing your daily notes. Default: `0 Profisee/Captains Log`. Subfolders are searched. |
+| **Watched folder** | The folder containing your daily notes. **Empty by default** — you must set this for the plugin to do anything. Subfolders are searched. Examples: `Daily Notes`, `Journal`, `Captains Log`. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction), `claude-sonnet-4-6` (~$0.02), or `claude-opus-4-7` (~$0.03). |
 | **Custom prompt** | Optional. Overrides the bundled extraction prompt. Advanced users only. |
@@ -52,11 +52,16 @@ After install, open Settings → Visual Notes:
 
 ```mermaid
 sequenceDiagram
+    participant User
+    participant Obsidian
+    participant Plugin
+    participant API as Claude API
+
     User->>Obsidian: save daily note
     Obsidian->>Plugin: vault.on('modify')
     Plugin->>Plugin: debounce + hash check
-    Plugin->>Claude API: messages.parse({system, user, schema})
-    Claude API-->>Plugin: structured JSON
+    Plugin->>API: requestUrl /v1/messages
+    API-->>Plugin: structured JSON (Zod-validated)
     Plugin->>Obsidian: write {date}-overview.json
     Obsidian->>Plugin: trigger MarkdownPostProcessor
     Plugin->>User: render Cytoscape inline

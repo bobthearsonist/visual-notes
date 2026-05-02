@@ -30,8 +30,10 @@ The sidecar schema is defined in [`shared/schema.json`](../../../../shared/schem
 
 ## Heuristics (summary)
 
-The full heuristics live in `references/visual-heuristic.md` (post-migration).
-Quick summary:
+The bundled extraction prompt at
+`plugins/obsidian-plugin/prompts/extract-graph.md` is the canonical
+source for these heuristics — both the Obsidian plugin and any
+agent pre-populating a sidecar should follow them. Quick summary:
 
 1. Every edge has a label — the label IS the insight
 2. Hierarchy encodes importance
