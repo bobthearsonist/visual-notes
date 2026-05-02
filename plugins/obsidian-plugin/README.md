@@ -7,9 +7,11 @@ the top of the rendered note view.
 
 ## Status
 
-🚧 **Phase 1 — scaffold only.** Manifest and directory structure are in
-place; implementation pending. See [`../../docs/design.md`](../../docs/design.md)
-§4 for the full design and §9 for implementation phases.
+🚧 **Phase 1 MVP.** The plugin now includes the Obsidian build scaffold,
+settings tab, manual and watched-folder extraction, sidecar writing,
+pin/unpin/delete commands, and inline Cytoscape rendering from the sidecar.
+See [`../../docs/design.md`](../../docs/design.md) §4 for the full design
+and §9 for implementation phases.
 
 ## Install (after first release)
 
@@ -42,7 +44,7 @@ After install, open Settings → Visual Notes:
 
 | Setting | What it does |
 |---|---|
-| **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in OS keychain on desktop, plaintext `data.json` on mobile (with warning in the field description). |
+| **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in plaintext `data.json` for this first pass. |
 | **Watched folders** | A list of folders containing daily notes. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add multiple folders if you keep separate work/personal/project journals (e.g., `Captains Log`, `0 Daily ADHD Brain Logs`, `Projects/visual-notes/Journal`). Each folder produces its own sidecars in-place; same model, same prompt, same schema across all watched folders. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |

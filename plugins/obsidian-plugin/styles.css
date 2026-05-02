@@ -1,0 +1,33 @@
+.visual-notes-container {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  margin: 0 0 1rem;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.visual-notes-header {
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.visual-notes-title {
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.visual-notes-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-top: 0.25rem;
+}
+
+.visual-notes-graph {
+  height: 450px;
+  min-height: 320px;
+  width: 100%;
+}
+
+.visual-notes-placeholder {
+  color: var(--text-muted);
+  padding: 1rem;
+}
