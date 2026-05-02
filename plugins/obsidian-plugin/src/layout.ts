@@ -7,10 +7,10 @@ const CLUSTER_GAP_Y = 170;
 const MAX_CLUSTER_COLUMNS = 2;
 const COLLISION_RADIUS_X = 120;
 const COLLISION_RADIUS_Y = 92;
+const VISIBLE_MIN_X = 20;
+const VISIBLE_MIN_Y = 40;
 const MAX_X = 5000;
 const MAX_Y = 3000;
-const MIN_X = -200;
-const MIN_Y = -200;
 
 type NodeType = "system" | "task" | "decision";
 type NodeStatus = "completed" | "active" | "context" | "blocked";
@@ -223,6 +223,8 @@ function layoutComponent(
     });
   });
 
+  shiftComponentIntoVisibleCanvas(positionById, usedPositions, componentPositions);
+
   return {
     minY: Math.min(...componentPositions.map((position) => position.y)),
     maxY: Math.max(...componentPositions.map((position) => position.y)),
@@ -236,14 +238,49 @@ function setPosition(
   usedPositions: Position[],
   componentPositions: Position[],
 ): void {
-  const clamped = {
-    x: clamp(Math.round(position.x), MIN_X, MAX_X),
-    y: clamp(Math.round(position.y), MIN_Y, MAX_Y),
-  };
+  const clamped = clampPosition(position);
 
   positionById.set(id, clamped);
   usedPositions.push(clamped);
   componentPositions.push(clamped);
+}
+
+function shiftComponentIntoVisibleCanvas(
+  positionById: Map<string, Position>,
+  usedPositions: Position[],
+  componentPositions: Position[],
+): void {
+  if (componentPositions.length === 0) {
+    return;
+  }
+
+  const minX = Math.min(...componentPositions.map((position) => position.x));
+  const minY = Math.min(...componentPositions.map((position) => position.y));
+  const shift = {
+    x: Math.max(0, VISIBLE_MIN_X - minX),
+    y: Math.max(0, VISIBLE_MIN_Y - minY),
+  };
+
+  if (shift.x === 0 && shift.y === 0) {
+    return;
+  }
+
+  for (const [id, position] of positionById.entries()) {
+    if (!componentPositions.includes(position)) {
+      continue;
+    }
+
+    const shifted = clampPosition({ x: position.x + shift.x, y: position.y + shift.y });
+    positionById.set(id, shifted);
+    const usedIndex = usedPositions.indexOf(position);
+    if (usedIndex >= 0) {
+      usedPositions[usedIndex] = shifted;
+    }
+    const componentIndex = componentPositions.indexOf(position);
+    if (componentIndex >= 0) {
+      componentPositions[componentIndex] = shifted;
+    }
+  }
 }
 
 function bucketNodes(nodes: NodeInfo[]): Record<SlotBucket, NodeInfo[]> {
@@ -486,4 +523,11 @@ function distance(left: Position, right: Position): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampPosition(position: Position): Position {
+  return {
+    x: clamp(Math.round(position.x), VISIBLE_MIN_X, MAX_X),
+    y: clamp(Math.round(position.y), VISIBLE_MIN_Y, MAX_Y),
+  };
 }
