@@ -1,8 +1,17 @@
-import { readFileSync, writeFileSync } from "fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-const versions = JSON.parse(readFileSync("versions.json", "utf8"));
+const pluginDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(pluginDir, "..", "..");
+const manifestPath = join(pluginDir, "manifest.json");
+const versionsPath = join(pluginDir, "versions.json");
+
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const versions = JSON.parse(readFileSync(versionsPath, "utf8"));
 
 versions[manifest.version] = manifest.minAppVersion;
 
-writeFileSync("versions.json", `${JSON.stringify(versions, null, "\t")}\n`);
+writeFileSync(versionsPath, `${JSON.stringify(versions, null, "\t")}\n`);
+copyFileSync(manifestPath, join(repoRoot, "manifest.json"));
+copyFileSync(versionsPath, join(repoRoot, "versions.json"));

@@ -14,7 +14,7 @@
     "validate:layout": "node scripts/layout-metrics.mjs",
     "validate:renderer": "node scripts/renderer-contract.mjs",
     "layout:metrics": "node scripts/layout-metrics.mjs",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json ../../manifest.json ../../versions.json"
   },
   "keywords": ["obsidian", "plugin", "concept-map", "visual-notes"],
   "author": "bobthearsonist",

@@ -214,9 +214,15 @@ Repository layout:
 
 ```text
 visual-notes/
-├── README.md
+├── README.md                         # this file
+├── LICENSE                           # MIT
+├── manifest.json                     # marketplace metadata mirror
+├── versions.json                     # marketplace compatibility mirror
 ├── docs/
-│   └── design.md
+│   ├── design.md
+│   └── marketplace-readiness.md      # release/submission checklist
+├── scripts/
+│   └── package-obsidian-plugin.mjs   # builds release-ready Obsidian assets
 ├── shared/
 │   ├── package.json
 │   └── schema.json
@@ -238,7 +244,14 @@ visual-notes/
 - [Obsidian plugin README](plugins/obsidian-plugin/README.md)
 - [Claude Code plugin README](plugins/claude-code-plugin/README.md)
 - [Living design document](docs/design.md)
+- [Marketplace readiness checklist](docs/marketplace-readiness.md)
 - [Project issues](https://github.com/bobthearsonist/visual-notes/issues)
+
+Marketplace readiness is tracked in
+[`docs/marketplace-readiness.md`](docs/marketplace-readiness.md). To produce
+release-ready Obsidian assets, run `pnpm package:obsidian` from the repo root.
+The root `manifest.json`/`versions.json` files are marketplace-facing mirrors of
+the Obsidian plugin metadata under `plugins/obsidian-plugin`.
 
 ## License
 
