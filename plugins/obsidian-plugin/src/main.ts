@@ -401,11 +401,14 @@ export default class VisualNotesPlugin extends Plugin {
       await this.app.vault.adapter.write(sidecarPath, `${JSON.stringify(stamped, null, 2)}\n`);
       this.sidecarEvents.trigger("changed", sidecarPath);
       this.queueVisualNotesMount(file.path);
+
+      const shouldShowFirstRunNotice = !this.settings.firstRunNoticeShown;
+      if (shouldShowFirstRunNotice) {
+        this.settings.firstRunNoticeShown = true;
+      }
       await this.incrementExtractionCounter();
 
-      if (!this.settings.firstRunNoticeShown) {
-        this.settings.firstRunNoticeShown = true;
-        await this.saveSettings();
+      if (shouldShowFirstRunNotice) {
         new Notice("Visual Notes: first extraction succeeded. Cost ~$0.006 per save at default model.");
       } else if (options.manual) {
         new Notice("Visual Notes: extraction complete.");
