@@ -45,13 +45,57 @@
       "default": false,
       "description": "When true, suppresses automatic re-extraction by the Obsidian plugin. The Claude Code plugin sets this to claim authoritative ownership of the sidecar (deliberate, curated content); the Obsidian plugin honors it on read. Land this in v0.1, not deferred to a future release."
     },
+    "_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Plugin-maintained extraction usage metadata. The LLM should omit this field; the Obsidian plugin stamps it from Anthropic API response usage and carries cumulative totals forward across sidecar rewrites.",
+      "required": ["currency", "last", "cumulative"],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "const": "USD"
+        },
+        "last": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "inputTokens", "outputTokens", "totalTokens", "estimatedCostUsd"],
+          "properties": {
+            "model": { "type": "string", "minLength": 1 },
+            "inputTokens": { "type": "integer", "minimum": 0 },
+            "outputTokens": { "type": "integer", "minimum": 0 },
+            "totalTokens": { "type": "integer", "minimum": 0 },
+            "estimatedCostUsd": { "type": "number", "minimum": 0 }
+          }
+        },
+        "cumulative": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "extractions",
+            "inputTokens",
+            "outputTokens",
+            "totalTokens",
+            "estimatedCostUsd"
+          ],
+          "properties": {
+            "extractions": { "type": "integer", "minimum": 0 },
+            "inputTokens": { "type": "integer", "minimum": 0 },
+            "outputTokens": { "type": "integer", "minimum": 0 },
+            "totalTokens": { "type": "integer", "minimum": 0 },
+            "estimatedCostUsd": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
     "nodes": {
       "type": "array",
+      "minItems": 1,
       "maxItems": 50,
       "description": "Cytoscape node specs. Schema caps at 50 (the prompt's design heuristic targets 30); past that, rendering hitches and the visual stops being readable. If a note genuinely has more concepts, the LLM should cluster them into summary nodes (e.g., 'build issues (12)') rather than producing a flat list.",
       "items": {
         "type": "object",
-        "required": ["data"],
+        "required": ["data", "classes", "position"],
+        "additionalProperties": false,
         "properties": {
           "data": {
             "type": "object",
@@ -64,6 +108,7 @@
               },
               "label": {
                 "type": "string",
+                "minLength": 1,
                 "description": "Display label. Use \\n for line breaks (target ~2-4 words per line)."
               }
             },
@@ -78,6 +123,7 @@
           "position": {
             "type": "object",
             "required": ["x", "y"],
+            "additionalProperties": false,
             "properties": {
               "x": { "type": "number", "minimum": -200, "maximum": 5000 },
               "y": { "type": "number", "minimum": -200, "maximum": 3000 }
@@ -93,25 +139,36 @@
       "description": "Cytoscape edge specs. Schema caps at 100; with 50 nodes that's 2 edges per node, well above what the prompt's design heuristics produce in practice.",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["data"],
         "properties": {
           "data": {
             "type": "object",
-            "required": ["source", "target"],
+            "required": ["source", "target", "label"],
             "properties": {
-              "source": { "type": "string", "description": "ID of the source node." },
-              "target": { "type": "string", "description": "ID of the target node." },
+              "source": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "ID of the source node."
+              },
+              "target": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "ID of the target node."
+              },
               "label": {
                 "type": "string",
-                "description": "Verb phrase describing the relationship. Required for design quality; not enforced at schema level for forward compatibility."
+                "minLength": 1,
+                "description": "Verb phrase describing the relationship. Required because the edge label carries the visual insight."
               }
             },
             "additionalProperties": true
           },
           "classes": {
             "type": "string",
-            "description": "Optional edge style class. Empty/omitted: default 2px solid. 'strong-edge': 3px darker. 'weak-edge': 1px dashed (use for cross-domain connections).",
-            "examples": ["", "strong-edge", "weak-edge"]
+            "enum": ["strong-edge", "weak-edge"],
+            "description": "Optional edge style class. Omitted: default 2px solid. 'strong-edge': 3px darker. 'weak-edge': 1px dashed (use for cross-domain connections).",
+            "examples": ["strong-edge", "weak-edge"]
           }
         }
       }
