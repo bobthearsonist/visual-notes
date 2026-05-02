@@ -35,7 +35,7 @@ export default class VisualNotesPlugin extends Plugin {
 
   private readonly debounceTimers = new Map<string, DebouncedExtraction>();
   private readonly forceRegenerateCooldowns = new Map<string, number>();
-  private readonly mountedSourcePaths = new Set<string>();
+  private readonly pendingMountSourcePaths = new Set<string>();
   private statusBarEl: HTMLElement | null = null;
   private activeExtractions = 0;
 
@@ -72,7 +72,7 @@ export default class VisualNotesPlugin extends Plugin {
   onunload(): void {
     this.debounceTimers.forEach((timer) => timer.cancel());
     this.debounceTimers.clear();
-    this.mountedSourcePaths.clear();
+    this.pendingMountSourcePaths.clear();
   }
 
   async loadSettings(): Promise<void> {
@@ -104,10 +104,6 @@ export default class VisualNotesPlugin extends Plugin {
     }
 
     console[level](prefix, data);
-  }
-
-  unmarkMountedSourcePath(sourcePath: string): void {
-    this.mountedSourcePaths.delete(sourcePath);
   }
 
   private registerCommands(): void {
@@ -162,57 +158,56 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
-    if (this.hasLiveContainerForSource(ctx.sourcePath)) {
+    if (this.pendingMountSourcePaths.has(ctx.sourcePath)) {
       return;
     }
 
-    if (this.mountedSourcePaths.has(ctx.sourcePath)) {
-      this.mountedSourcePaths.delete(ctx.sourcePath);
+    this.pendingMountSourcePaths.add(ctx.sourcePath);
+    window.setTimeout(() => {
+      this.pendingMountSourcePaths.delete(ctx.sourcePath);
+      this.mountVisualNotesInPreview(ctx);
+    }, 0);
+  }
+
+  private mountVisualNotesInPreview(ctx: MarkdownPostProcessorContext): void {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!(activeFile instanceof TFile) || activeFile.path !== ctx.sourcePath) {
+      return;
     }
 
-    const section =
-      el.closest(".markdown-preview-section") ??
-      el.parentElement?.closest(".markdown-preview-section") ??
-      el.parentElement ??
-      el;
+    const leaf = this.app.workspace
+      .getLeavesOfType("markdown")
+      .find((candidate) => {
+        const view = candidate.view;
+        return view instanceof MarkdownView && view.file?.path === ctx.sourcePath;
+      });
+    if (!leaf || !(leaf.view instanceof MarkdownView)) {
+      return;
+    }
+
+    const section = leaf.view.containerEl.querySelector(".markdown-preview-section");
     if (!(section instanceof HTMLElement)) {
       return;
     }
 
-    if (section.querySelector(".visual-notes-container")) {
-      return;
-    }
-
-    const previewRoot = section.closest(".markdown-preview-view") ?? section;
-    const rootDataset = previewRoot instanceof HTMLElement ? previewRoot.dataset : null;
-    if (rootDataset?.visualNotesSourcePath === ctx.sourcePath) {
-      return;
-    }
+    section
+      .querySelectorAll(`.visual-notes-container[data-visual-notes-source-path="${cssEscape(ctx.sourcePath)}"]`)
+      .forEach((container) => container.remove());
 
     const container = document.createElement("div");
     container.classList.add("visual-notes-container");
     container.dataset.visualNotesSourcePath = ctx.sourcePath;
-    if (rootDataset) {
-      rootDataset.visualNotesSourcePath = ctx.sourcePath;
-    }
-    section.prepend(container);
-    this.mountedSourcePaths.add(ctx.sourcePath);
-    const child = new VisualNotesRenderChild(container, this, ctx.sourcePath);
-    ctx.addChild(child);
-    window.requestAnimationFrame(() => {
-      if (container.isConnected && container.childElementCount === 0) {
-        void child.refresh();
-      }
-    });
-  }
 
-  private hasLiveContainerForSource(sourcePath: string): boolean {
-    return Array.from(document.querySelectorAll(".visual-notes-container")).some(
-      (container) =>
-        container instanceof HTMLElement &&
-        container.isConnected &&
-        container.dataset.visualNotesSourcePath === sourcePath,
-    );
+    const insertionTarget = findFrontmatterBoundary(section);
+    if (insertionTarget?.nextSibling) {
+      section.insertBefore(container, insertionTarget.nextSibling);
+    } else if (insertionTarget) {
+      section.appendChild(container);
+    } else {
+      section.prepend(container);
+    }
+
+    ctx.addChild(new VisualNotesRenderChild(container, this, ctx.sourcePath));
   }
 
   private withActiveMarkdownFile(
@@ -462,4 +457,22 @@ type DebouncedExtraction = ReturnType<typeof debounce>;
 
 function titleForFile(file: TFile): string {
   return `Daily Overview - ${file.basename}`;
+}
+
+function findFrontmatterBoundary(section: HTMLElement): Element | null {
+  const directChildren = Array.from(section.children);
+  const frontmatter = directChildren.find((child) =>
+    child.classList.contains("mod-header") ||
+    child.classList.contains("mod-frontmatter") ||
+    child.querySelector(".metadata-container") !== null,
+  );
+  if (frontmatter) {
+    return frontmatter;
+  }
+
+  return directChildren.find((child) => child.classList.contains("markdown-preview-pusher")) ?? null;
+}
+
+function cssEscape(value: string): string {
+  return value.replace(/["\\]/g, "\\$&");
 }

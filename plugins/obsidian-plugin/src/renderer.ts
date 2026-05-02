@@ -24,7 +24,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   onload(): void {
-    this.moveContainerToPreviewSection();
     this.removeDuplicateContainersForSource();
     this.sidecarEventRef = this.plugin.sidecarEvents.on("changed", (sidecarPath: unknown) => {
       if (typeof sidecarPath === "string" && normalizePath(sidecarPath) === this.sidecarPath) {
@@ -39,7 +38,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   onunload(): void {
     const previewRoot = this.containerEl.closest(".markdown-preview-view");
     this.destroyGraph();
-    this.plugin.unmarkMountedSourcePath(this.sourcePath);
     if (
       previewRoot instanceof HTMLElement &&
       previewRoot.dataset.visualNotesSourcePath === this.sourcePath
@@ -260,13 +258,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   private destroyGraph(): void {
     this.cy?.destroy();
     this.cy = null;
-  }
-
-  private moveContainerToPreviewSection(): void {
-    const section = this.containerEl.closest(".markdown-preview-section");
-    if (section instanceof HTMLElement && this.containerEl.parentElement !== section) {
-      section.prepend(this.containerEl);
-    }
   }
 
   private removeDuplicateContainersForSource(): void {
