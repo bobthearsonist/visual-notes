@@ -95,7 +95,7 @@ file, regardless of who wrote it.
 1. Install BRAT in Obsidian
 2. In BRAT settings, add:  bobthearsonist/visual-notes
 3. Open Visual Notes settings, paste your Anthropic API key
-4. Set "Watched folder" to your daily-notes folder
+4. Add at least one folder to "Watched folders" (your daily-notes folder; add multiple if you keep separate work/personal/project journals)
 5. Edit a daily note → visual appears at the top
 ```
 
@@ -118,7 +118,9 @@ Full instructions: [`plugins/claude-code-plugin/README.md`](plugins/claude-code-
 │                                                    │
 │  Anthropic API key   [••••••••••••••••]    [Show]  │
 │                                                    │
-│  Watched folder      [                       ]     │
+│  Watched folders     [Captains Log         ] [×]   │
+│                      [0 Daily ADHD Brain   ] [×]   │
+│                      [+ Add folder]                │
 │                      ⚠ Required. Empty = inactive  │
 │                                                    │
 │  Debounce (ms)       [1500          ]              │
@@ -130,9 +132,10 @@ Full instructions: [`plugins/claude-code-plugin/README.md`](plugins/claude-code-
 └────────────────────────────────────────────────────┘
 ```
 
-Five settings. Defaults are conservative; the "Watched folder" is
-intentionally empty so the plugin stays inert until you point it at
-your daily-notes folder.
+Watch as many folders as you want — work daily notes, personal daily
+notes, per-project journals — all share the same model and prompt.
+The list is intentionally empty by default so the plugin stays inert
+until you configure it.
 
 Commands available in the command palette:
 
@@ -303,7 +306,7 @@ The plugin sends the **full content** of your daily note to the Claude
 API for extraction. By default Anthropic does not retain content beyond
 the request lifetime, but read [their privacy
 policy](https://www.anthropic.com/legal/privacy). Don't put sensitive
-content in the watched folder.
+content in any watched folder.
 
 ---
 

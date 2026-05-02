@@ -43,7 +43,7 @@ After install, open Settings → Visual Notes:
 | Setting | What it does |
 |---|---|
 | **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in OS keychain on desktop, plaintext `data.json` on mobile (with warning in the field description). |
-| **Watched folder** | The folder containing your daily notes. **Empty by default** — you must set this for the plugin to do anything. Subfolders are searched. Examples: `Daily Notes`, `Journal`, `Captains Log`. |
+| **Watched folders** | A list of folders containing daily notes. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add multiple folders if you keep separate work/personal/project journals (e.g., `Captains Log`, `0 Daily ADHD Brain Logs`, `Projects/visual-notes/Journal`). Each folder produces its own sidecars in-place; same model, same prompt, same schema across all watched folders. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |
 
@@ -98,7 +98,7 @@ The plugin sends the **full markdown content** of the daily note to Anthropic's
 API for extraction. By default, your notes do not stay on Anthropic's servers
 beyond what's required for the API call (see [Anthropic's privacy policy](https://www.anthropic.com/legal/privacy)).
 Sensitive notes you don't want sent to a third-party API should not live
-in the watched folder.
+in any watched folder.
 
 ## License
 

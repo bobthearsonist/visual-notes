@@ -66,7 +66,7 @@ For users currently on the Claude-Code-hook-driven workflow:
   scoped to per-note concept extraction).
 - Real-time collaborative editing.
 - A fancy settings dashboard (cost UI, model picker, prompt-template editor).
-  Minimum viable settings: API key, watched folder, debounce ms.
+  Minimum viable settings: API key, watched folders (list), debounce ms.
 
 ---
 
@@ -262,13 +262,14 @@ plugins/obsidian-plugin/
 2. Initialize secure storage helper (probe `app.vault.getAdapter().getSecretStorage()`)
 3. Register `PluginSettingTab`
 4. Register `vault.on('modify')` event with debounced + hash-checked handler
-5. Register `MarkdownPostProcessor` for files matching the watched-folder pattern
+5. Register `MarkdownPostProcessor` for files matching any watched-folder pattern
 6. Register `app.workspace.on('css-change')` for theme refresh
 
 **File save:**
 1. `vault.on('modify')` fires
-2. Path filter: only files in watched folder, only `.md` files (not the
-   sidecar `.json` itself, which would create a feedback loop)
+2. Path filter: only files inside any of the watched folders (recursive),
+   only `.md` files (not the sidecar `.json` itself, which would create
+   a feedback loop)
 3. Pass to debounced handler (1.5s wait, configurable)
 4. Hash check the markdown body; skip if unchanged from sidecar's
    `_lastProcessedHash`
@@ -445,15 +446,28 @@ Minimum viable. `PluginSettingTab` with these fields:
 | Setting | Type | Default | Storage |
 |---|---|---|---|
 | Anthropic API key | text (password style) | empty | SecretStorage on desktop, data.json on mobile (with warning) |
-| Watched folder | text | **empty** (forces explicit config) | data.json |
+| Watched folders | list of text inputs (add/remove buttons) | empty list (forces explicit config) | data.json |
 | Debounce (ms) | number | 1500 | data.json |
 | Model | dropdown (Haiku 4.5 / Sonnet 4.6) | Haiku 4.5 | data.json |
 
-The "Watched folder" default is **deliberately empty**. The plugin stays
-inert until the user points it at their daily-notes folder. On plugin
-load, if the folder is empty AND the API key is set, surface a one-time
-Notice: "Visual Notes: set a watched folder in Settings to enable
-extraction."
+**Watched folders is a list, not a single value.** Many users have
+multiple daily-note folders (work + personal, or per-project). The
+plugin watches all of them; each folder produces its own per-day
+sidecars in-place. There is no per-folder configuration — same prompt,
+same model, same schema across folders. If a user needs different
+behavior per folder (e.g., different model for personal vs work),
+that's a future feature; v0.1 keeps the dial uniform.
+
+The "Watched folders" default is **deliberately empty**. The plugin
+stays inert until the user adds at least one folder. On plugin load, if
+the list is empty AND the API key is set, surface a one-time Notice:
+"Visual Notes: add a watched folder in Settings to enable extraction."
+
+Watcher logic: `vault.on('modify')` fires for any file change. The
+plugin checks whether the file's parent (or any ancestor) is in the
+watched-folders list. If yes, queue for extraction. If no, ignore.
+Subfolders inherit watch by default (e.g., adding `Captains Log`
+also watches `Captains Log/2026/`).
 
 **Command palette entries** (always available):
 
@@ -476,7 +490,7 @@ catch runaway behavior without complexity.
   extraction after midnight.
 - **Color/state**: gray when configured + idle; yellow with spinner
   during in-flight; red when configuration is incomplete (no API key
-  OR no watched folder). Red state is the "high-discoverability cue"
+  OR empty watched-folders list). Red state is the "high-discoverability cue"
   for first-run users who haven't finished setup.
 - **First-run Notice**: after the first successful extraction in a
   fresh install, fire a one-time Notice (gated by `firstRunComplete: false`
@@ -919,7 +933,7 @@ weeks otherwise.
 ### Phase 3 — Settings polish + storage (week 3)
 
 - SecretStorage on desktop, plaintext warning on mobile
-- Watched-folder configurability
+- Per-folder configurability (different model/prompt per watched folder — v0.1 keeps the dial uniform)
 - Model dropdown (Haiku / Sonnet)
 - Custom prompt override (textarea)
 
@@ -991,8 +1005,8 @@ sidecar; force-regen overrides.
 | Scenario | Handling |
 |---|---|
 | **API key missing** on plugin load | Status-bar shows "Visual Notes: configure API key". File watcher stays inert. |
-| **Watched folder unset** on plugin load | Status-bar shows "Visual Notes: set watched folder". One-time Notice on first load. |
-| **Watched folder doesn't exist** | Notice on plugin load. File watcher inert until folder exists. |
+| **Watched folders list empty** on plugin load | Status-bar shows "Visual Notes: add a watched folder". One-time Notice on first load. |
+| **A configured folder doesn't exist in the vault** | Notice on plugin load naming the missing folder. Other configured folders continue to be watched normally; the missing one is rechecked next load. |
 | **Anthropic API down** (5xx) | Bounded retry (3×, exponential backoff). On exhaustion, queue for next manual trigger; status-bar shows "queued". |
 | **Network failure** (no internet) | Treated as 5xx. Same retry/queue behavior. |
 | **Rate limit** (429) | Honor `retry-after`, exponential backoff, max 3 retries. |
@@ -1122,8 +1136,8 @@ override the whole prompt via settings.
 | Term | Meaning |
 |---|---|
 | **Sidecar** | The `{date}-overview.json` file that lives next to the daily note, holding the extracted graph data. |
-| **Watched folder** | The Obsidian folder the plugin monitors for daily-note changes. Empty by default; user must configure. |
-| **Daily note** | A markdown file named `YYYYMMDD.md` in the watched folder. |
+| **Watched folders** | The list of Obsidian folders the plugin monitors for daily-note changes. Empty by default; user must add at least one. Subfolders are watched recursively. |
+| **Daily note** | A markdown file named `YYYYMMDD.md` in any of the watched folders. |
 | **Overview** | The visual concept map rendered for a daily note. |
 | **Session-whiteboard** (legacy) | Per-conversation `{date}-session-{n}.json` sidecars from the original visual-notes skill. **Note:** "session" elsewhere in this doc refers to a conversational unit (an "AI session summary" in a daily note). When ambiguous, use "session-whiteboard" for the file format and "session summary" or "conversation" for the content unit. |
 | **Producer** | Any code that writes a sidecar. The Obsidian plugin and the Claude Code plugin are the two producers. |
@@ -1138,7 +1152,7 @@ For maintainers and the user when something doesn't work as expected.
 
 | Symptom | Where to look |
 |---|---|
-| Visual doesn't appear | Open DevTools (Ctrl+Shift+I in Obsidian). Filter console for `[visual-notes]`. Check for "watched folder unset", "API key invalid", or extraction errors. |
+| Visual doesn't appear | Open DevTools (Ctrl+Shift+I in Obsidian). Filter console for `[visual-notes]`. Check for "no watched folders configured", "API key invalid", or extraction errors. Also: confirm the note's folder is in the watched-folders list. |
 | Visual is stale | Run `Visual Notes: Regenerate (force)` from command palette. Bypasses pin and cached hash. |
 | Visual shows wrong content | Check the sidecar: open `{date}-overview.json` next to the daily note. Is `_pinned: true`? An agent may have locked it; run `Visual Notes: Unpin this overview` then regenerate. |
 | Repeated API calls visible in status-bar count | Check that the `_lastProcessedHash` field is being written to the sidecar (look for `sha256:` prefix). If absent, the dedup is broken. |
