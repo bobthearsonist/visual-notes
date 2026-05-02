@@ -20,8 +20,8 @@ common case without it.
 repo and is being ported here. Until then, the manifest and directory
 structure are scaffolded but the hooks/skills are placeholders.
 
-See [`../../docs/design.md`](../../docs/design.md) §5 for the design and §9
-Phase 5 for the migration plan.
+See [`../../docs/design.md`](../../docs/design.md) for the remaining migration
+plan and open decisions.
 
 ## Install (after migration)
 

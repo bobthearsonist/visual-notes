@@ -6,8 +6,8 @@ description: Concept-map visualization for daily notes. Documents the sidecar JS
 # Visual Notes (Claude Code skill)
 
 > **Scaffold placeholder.** Migration of the full skill from the private
-> dotfiles repo is pending. See [`../../../docs/design.md`](../../../docs/design.md)
-> §5 for the migration plan.
+> dotfiles repo is pending. See the living design document for the migration
+> plan.
 
 ## What this skill is for
 
@@ -46,5 +46,5 @@ agent pre-populating a sidecar should follow them. Quick summary:
 
 If the Obsidian plugin is also installed, both producers can write the
 sidecar. **Last writer wins.** For workflows where you want the agent's
-curated graph to stick, set `_pinned: true` in the sidecar (future feature)
-to suppress auto-extraction.
+curated graph to stick, set `_pinned: true` in the sidecar to suppress
+auto-extraction until the user unpins or force-regenerates.
