@@ -8,8 +8,9 @@ import {
   normalizePath,
 } from "obsidian";
 import { AnthropicExtractionError, extractGraphFromAnthropic } from "./extractor";
-import { estimateTokens, sha256Hash } from "./hash";
+import { estimateTokens, hashMarkdownSections, sha256Hash } from "./hash";
 import { sidecarPathForMarkdownPath, VisualNotesRenderChild } from "./renderer";
+import { mergeSectionedGraph } from "./sectioned-sidecar";
 import { parseSidecar, type VisualNotesSidecar } from "./schema";
 import {
   currentLocalDate,
@@ -350,7 +351,7 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
-    const hash = await sha256Hash(markdown);
+    const [hash, sections] = await Promise.all([sha256Hash(markdown), hashMarkdownSections(markdown)]);
     const sidecarPath = sidecarPathForMarkdownPath(file.path);
     const existingSidecar = await this.readSidecarForExtraction(sidecarPath, options);
 
@@ -378,17 +379,25 @@ export default class VisualNotesPlugin extends Plugin {
         apiKey: this.settings.anthropicApiKey,
         model: this.settings.model,
         markdown,
+        sections,
         sourcePath: file.path,
       });
       const extracted = extraction.graph;
+      const sectionedGraph = mergeSectionedGraph({
+        extracted,
+        existing: existingSidecar,
+        sections,
+        force: options.force,
+      });
 
       const stamped: VisualNotesSidecar = {
         kind: "daily-overview",
         title: extracted.title ?? titleForFile(file),
         header: extracted.header ?? "Daily Overview",
         subtitle: extracted.subtitle,
-        nodes: extracted.nodes,
-        edges: extracted.edges,
+        nodes: sectionedGraph.nodes,
+        edges: sectionedGraph.edges,
+        _sections: sectionedGraph.sections,
         _lastProcessedHash: hash,
         _extractedBy: PRODUCER_ID,
         _schemaVersion: SETTINGS_VERSION,

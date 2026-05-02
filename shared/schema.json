@@ -30,6 +30,67 @@
       "pattern": "^sha256:[a-f0-9]{64}$",
       "description": "SHA-256 hash of the markdown body the sidecar was extracted from. Format: 'sha256:' prefix + 64 lowercase hex chars (matches Node's `crypto.createHash('sha256').digest('hex')` output WITH the 'sha256:' literal prefix prepended). Used to skip redundant API calls when the markdown hasn't changed (handles Obsidian Sync's per-device modify storm)."
     },
+    "_sections": {
+      "type": "array",
+      "maxItems": 200,
+      "description": "Optional section-aware extraction metadata maintained by producers. Each entry records the stable markdown section id, direct-section hash, line span, and graph fragment ids used by the plugin to reuse unchanged section nodes/edges/positions while replacing changed or deleted sections deterministically. Consumers that do not implement section-aware merging may ignore this field.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "level", "ordinal", "startLine", "endLine", "hash", "nodeIds", "edgeIds"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "Stable deterministic section id generated from the heading path. The pre-heading body uses 'document'."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "Markdown heading depth, or 0 for the pre-heading document section."
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based order of the parsed section in the source markdown."
+          },
+          "startLine": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "endLine": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "SHA-256 hash of this section's direct markdown slice."
+          },
+          "nodeIds": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            }
+          },
+          "edgeIds": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            }
+          }
+        }
+      }
+    },
     "_extractedBy": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*@\\d+\\.\\d+\\.\\d+(?:[-+][\\w.-]+)?$",
@@ -110,6 +171,11 @@
                 "type": "string",
                 "minLength": 1,
                 "description": "Display label. Use \\n for line breaks (target ~2-4 words per line)."
+              },
+              "sectionId": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "Optional producer metadata identifying the markdown section that supplied this node. Used by section-aware producers to keep unchanged sections stable across saves."
               }
             },
             "additionalProperties": true
@@ -160,6 +226,16 @@
                 "type": "string",
                 "minLength": 1,
                 "description": "Verb phrase describing the relationship. Required because the edge label carries the visual insight."
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "Optional stable edge identifier. Producers may stamp this so section metadata can reference edge fragments."
+              },
+              "sectionId": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "Optional producer metadata identifying the markdown section where this relationship is grounded. Cross-section edges should use the section where the evidence appears."
               }
             },
             "additionalProperties": true
