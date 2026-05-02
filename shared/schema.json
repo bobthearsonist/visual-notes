@@ -11,7 +11,7 @@
       "type": "string",
       "enum": ["daily-overview", "session-whiteboard", "rollup"],
       "default": "daily-overview",
-      "description": "Discriminates between sidecar variants. v0.1 only renders 'daily-overview'; the other values are reserved for future expansion (per-conversation whiteboards, weekly retros, etc.) so we don't have to fork the schema later."
+      "description": "Discriminates sidecar variants. v0.1 renderers handle only 'daily-overview' (and sidecars without a 'kind' field, which default to that). 'session-whiteboard' is a reserved placeholder for future per-conversation graphs (one sidecar per AI session, used for in-flight visual state). 'rollup' is reserved for future weekly/monthly aggregation views. Reserved values are stored without forking the schema; renderers that don't recognize a kind log a warning and skip rendering rather than crashing."
     },
     "title": {
       "type": "string",

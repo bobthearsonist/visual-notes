@@ -42,11 +42,15 @@ After install, open Settings → Visual Notes:
 
 | Setting | What it does |
 |---|---|
-| **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in OS keychain on desktop, plaintext `data.json` on mobile (with warning). |
+| **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in OS keychain on desktop, plaintext `data.json` on mobile (with warning in the field description). |
 | **Watched folder** | The folder containing your daily notes. **Empty by default** — you must set this for the plugin to do anything. Subfolders are searched. Examples: `Daily Notes`, `Journal`, `Captains Log`. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
-| **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction), `claude-sonnet-4-6` (~$0.02), or `claude-opus-4-7` (~$0.03). |
-| **Custom prompt** | Optional. Overrides the bundled extraction prompt. Advanced users only. |
+| **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |
+
+Custom prompt override is **not exposed in v0.1** — the bundled extraction
+prompt at `prompts/extract-graph.md` is the canonical heuristic source.
+Advanced users wanting different extraction behavior can fork the plugin or
+wait for the prompt-override field in a later release.
 
 ## How it works
 

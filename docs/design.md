@@ -45,6 +45,20 @@ typing on any device) → the plugin reacts and updates the visual.
    layout). Visual quality is the LLM's responsibility but consistency comes
    from a fixed schema and prompt.
 
+### Before / after comparison
+
+For users currently on the Claude-Code-hook-driven workflow:
+
+| Concern | Before (hook-driven) | After (plugin-driven) |
+|---|---|---|
+| Trigger | Agent runs `obsidian append` | Anything that writes to the .md file |
+| Sidecar author | Agent designs graph + writes JSON | LLM extraction reads the .md, produces JSON |
+| Manual edits | Invisible to the visual | Captured on next save |
+| Mobile edits | Invisible | Captured after sync |
+| Multi-client (Copilot, OpenCode, etc.) | Each needs its own integration | Each writes markdown; plugin handles the rest |
+| Cost basis | Agent token spend on graph design | Anthropic API spend per save (~$0.006) |
+| Dependency on Claude Code | Required | Optional (works with no AI client at all) |
+
 ### Non-goals
 
 - A general-purpose graph editor.
@@ -230,8 +244,6 @@ plugins/obsidian-plugin/
 ├── styles.css              # Plugin styles + Cytoscape container CSS
 ├── prompts/
 │   └── extract-graph.md    # The structured-output prompt template
-├── templates/
-│   └── overview.html       # Cytoscape HTML template (placeholder substitution)
 └── src/
     ├── main.ts             # Plugin entry, lifecycle, event registration
     ├── extractor.ts        # Anthropic API client, structured output
@@ -294,7 +306,7 @@ const body = {
   max_tokens: 2048,
   system: systemPrompt,                // bundled extraction prompt
   messages: [{ role: 'user', content: markdownContent }],
-  output_config: { format: { type: 'json_schema', json_schema: graphJsonSchema } }
+  output_config: { format: { type: 'json_schema', schema: graphJsonSchema } }
 };
 
 const response = await requestUrl({
@@ -312,6 +324,24 @@ const response = await requestUrl({
 
 The response's `content[0].text` is the JSON string; parse + validate
 against `GraphSchema`.
+
+**Type-safety pipeline.** Without the SDK, type safety lands client-side:
+
+```
+requestUrl(...)            // returns RequestUrlResponse
+  ↓ .text                  // string
+  ↓ JSON.parse(...)        // any (UNSAFE)
+  ↓ GraphSchema.parse(...) // typed Graph (Zod)  ← belt
+  ↓ rendered               // Cytoscape consumes
+```
+
+The Anthropic API's `output_config.format.schema` is the server-side
+schema enforcer (suspenders). The Zod parse is the client-side
+enforcer (belt). Both layers are kept because:
+- Server-side enforcement reduces malformed responses (cheaper retry)
+- Client-side validation produces typed objects (no `any` leaks)
+- If they ever disagree, our code crashes loudly rather than silently
+  consuming bad data.
 
 **Default model:** Claude Haiku 4.5. Concept extraction is a
 pattern-matching task, not deep reasoning. ~$0.006/call, ~$2-5/month at
@@ -336,9 +366,28 @@ Opus is overkill — not exposed as a default option.
 | 5xx | Exponential backoff, **max 3 retries**, then queue. |
 | Network failure | Treat as 5xx. |
 
-All retries respect the **AbortController** registered in `onunload()` —
-if the user disables the plugin mid-flight, in-flight requests cancel
-cleanly.
+All retries respect a **single `AbortController`** held on the Plugin
+instance for the plugin's lifetime. Created in `onload()`; `abort()`
+called in `onunload()`. Every `requestUrl` call passes the
+controller's `.signal`, so plugin-disable cancels both in-flight
+requests and any backoff-waiting queue entries. One controller, not
+one-per-call — keeps lifecycle simple.
+
+**Sidecar reload event-emitter** lives on the Plugin instance as
+`this.sidecarEvents = new Events()` (Obsidian's built-in `Events`
+class). Each `MarkdownRenderChild` constructor receives a reference to
+the plugin and subscribes to `sidecarEvents.on('changed', filePath, …)`
+in `onload()`, unsubscribes in `onunload()`. The extractor fires the
+event after a successful write. No module-level singletons; teardown
+is clean when the plugin is disabled.
+
+**Logging strategy:** use `console.debug` for routine operations,
+`console.warn` for recoverable problems (sidecar kind unknown,
+malformed sidecar repaired), `console.error` for terminal errors that
+also fire a Notice. No telemetry / analytics in v0.1. The Plugin class
+exposes a `log(level, msg, data?)` helper that namespaces every
+message with `[visual-notes]` so users filtering DevTools can find
+plugin output quickly.
 
 **No streaming.** Fire-and-forget extraction; the JSON response is small
 enough (~750 output tokens) to render instantly when complete.
@@ -410,14 +459,35 @@ extraction."
 
 | Command | Behavior |
 |---|---|
-| `Visual Notes: Extract from current note` | Manual extraction. Bypasses debounce, runs immediately. Useful for "the visual is stale, force it." |
-| `Visual Notes: Regenerate (force)` | Same as above but discards the cached `_lastProcessedHash` first. Useful when the LLM produced a bad graph and you want a fresh attempt. |
-| `Visual Notes: Delete sidecar` | Removes the sidecar JSON (and the rendered visual). Escape hatch. |
+| `Visual Notes: Extract from current note` | Manual extraction. Bypasses debounce, runs immediately. Useful for "the visual is stale, force it." Honors `_pinned: true` and silently no-ops on pinned sidecars (with a Notice "sidecar is pinned — unpin first"). |
+| `Visual Notes: Regenerate (force)` | Discards the cached `_lastProcessedHash` AND ignores `_pinned: true`. Useful when the LLM produced a bad graph and you want a fresh attempt regardless of pin state. **Rate-limit guard: 30-second cooldown per file.** Repeated invocations within the cooldown silent-no-op with a Notice "regenerate cooldown — wait Ns"; protects against rage-click rate-limit blowouts. |
+| `Visual Notes: Pin this overview` | Sets `_pinned: true` on the current note's sidecar. Suppresses future LLM extractions until unpinned. Use this when the current visual is exactly what you want kept (e.g., agent-curated graph you don't want overwritten). |
+| `Visual Notes: Unpin this overview` | Sets `_pinned: false`. Resumes auto-extraction on next save. |
+| `Visual Notes: Delete sidecar` | Removes the sidecar JSON (and the rendered visual). Escape hatch. Fires Notice "sidecar deleted — next save will re-extract" so the user knows the recovery path. |
 
 **Status bar:** A small indicator showing today's extraction count and a
 spinner during in-flight calls ("Visual Notes: extracting…"). Replaces a
 full cost-tracking dashboard for v0.1; gives users enough visibility to
 catch runaway behavior without complexity.
+
+- **"Today" boundary**: local midnight in the OS timezone (vault has no
+  timezone concept; OS is the closest stable proxy). Persisted to
+  `data.json` as `{date: "YYYY-MM-DD", count: N}`. Resets on first
+  extraction after midnight.
+- **Color/state**: gray when configured + idle; yellow with spinner
+  during in-flight; red when configuration is incomplete (no API key
+  OR no watched folder). Red state is the "high-discoverability cue"
+  for first-run users who haven't finished setup.
+- **First-run Notice**: after the first successful extraction in a
+  fresh install, fire a one-time Notice (gated by `firstRunComplete: false`
+  in `data.json`): _"Visual Notes: first extraction succeeded. Cost ~$0.006
+  per save at default model. See settings to change."_ Sets cost
+  expectations at the moment they matter.
+- **401 affordance**: on 401, fire a `Notice` with text _"Visual Notes:
+  API key invalid. Open Settings → Visual Notes."_ at 8s duration on
+  desktop, 15s on mobile. Obsidian Notices don't natively support
+  clickable links; the text-instruction pattern is the standard
+  Obsidian-plugin idiom.
 
 **Cut from MVP:**
 - Custom prompt override (textarea). Premature on day 1; users haven't
@@ -434,7 +504,8 @@ hit the API for the same content.
 Solution: **content-hash dedup**.
 
 ```typescript
-const hash = sha256(markdownContent);
+// Schema requires the "sha256:" prefix; prepend it once at compute time.
+const hash = 'sha256:' + sha256(markdownContent);   // hex-digest, 64 chars
 const sidecar = await readSidecarIfExists(notePath);
 if (sidecar?._lastProcessedHash === hash) {
   return; // Already extracted this exact content
@@ -671,10 +742,19 @@ position nodes; LLM only produces structure). Decision deferred — see §10.
 
 - **Click a node → scroll the markdown to the related section.** This is
   the killer interaction for journal use — turns the visual into a
-  navigation aid, not just decoration. Implementation: each node's
-  `data.id` is also a search key into the markdown (`# heading slug` or
-  `==highlighted text==` match). On click, scroll the open note's editor
-  to the first match.
+  navigation aid, not just decoration. **Match precedence:**
+  1. **Heading-slug match.** Compare the node's `data.id` (already
+     kebab-case) to each markdown heading slugified the same way. First
+     match wins. Most reliable signal because the LLM derives ids from
+     headings.
+  2. **Label substring match (case-insensitive).** Search the markdown
+     body for the first occurrence of the node's `data.label` (with `\n`
+     replaced by space).
+  3. **No match.** Brief Notice "no match in markdown for '$label'"; no
+     scroll. Indicates LLM hallucinated a node not grounded in text;
+     useful debug signal.
+  Document this precedence in the implementation notes for renderer.ts
+  so behavior stays consistent across versions.
 - **Hover** on a node → bold border, highlight all connected edges
 - **Mouse out** → restore default
 - **Pan** with click-drag, **zoom** with wheel/pinch (touch on mobile)
@@ -748,9 +828,7 @@ visual-notes/
         ├── esbuild.config.mjs
         ├── styles.css
         ├── prompts/
-        │   └── extract-graph.md
-        ├── templates/
-        │   └── overview.html       # (Optional, kept for legacy iframe path)
+        │   └── extract-graph.md    # System prompt + few-shot examples
         └── src/
             ├── main.ts
             ├── extractor.ts
@@ -803,6 +881,8 @@ is doable for someone who's shipped Obsidian plugins before; budget 1.5–2
 weeks otherwise.
 
 - Repo scaffolded ✅ (initial commit landed)
+- Extraction prompt authored ✅ (`prompts/extract-graph.md`, with two
+  few-shot examples). The plugin has nothing to send without this.
 - Copy `esbuild.config.mjs`, `tsconfig.json`, `version-bump.mjs`,
   `versions.json`, `styles.css` from
   [obsidian-sample-plugin](https://github.com/obsidianmd/obsidian-sample-plugin).
@@ -866,23 +946,35 @@ than debugging in the wild.
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Debouncing: vault.modify (md file in scope)
+    Idle --> Debouncing: vault.modify (md in scope)
     Debouncing --> Debouncing: another modify resets timer
     Debouncing --> Hashing: 1.5s elapsed
     Hashing --> Idle: hash matches sidecar._lastProcessedHash
     Hashing --> CheckPin: hash differs OR no sidecar
     CheckPin --> Idle: sidecar._pinned == true
     CheckPin --> Extracting: not pinned
+
+    Idle --> Extracting: cmd: Extract from current note (skips Hashing+CheckPin if pinned-aware)
+    Idle --> Extracting: cmd: Regenerate (force) — bypasses _pinned + hash, 30s cooldown
+    Idle --> Idle: cmd: Pin this overview (writes _pinned=true)
+    Idle --> Idle: cmd: Unpin this overview (writes _pinned=false)
+    Idle --> Idle: cmd: Delete sidecar
+
     Extracting --> Writing: 200 OK + Zod-valid
     Extracting --> Extracting: Zod fail (1 retry with correction)
     Extracting --> Queued: 429 / 5xx (with backoff, max 3)
     Extracting --> Failed: 401 / 400 (terminal)
-    Extracting --> Idle: AbortController fired (plugin unload)
+    Extracting --> Idle: AbortController.abort() (plugin unload)
     Queued --> Extracting: backoff timer
+    Queued --> Idle: AbortController.abort() (plugin unload)
     Queued --> Failed: 3 retries exhausted
     Writing --> Idle: sidecar written, render triggered
     Failed --> Idle: user dismisses Notice or fixes config
 ```
+
+The `Idle → Extracting (cmd: Regenerate force)` transition is the
+unpin-and-extract escape hatch. The user is never stuck with a pinned
+sidecar; force-regen overrides.
 
 ### Failure scenarios + handling
 
@@ -903,6 +995,10 @@ stateDiagram-v2
 | **Plugin disabled mid-flight** | `AbortController.abort()` in `onunload()` cancels the in-flight `requestUrl`. No write happens. |
 | **Two views of same file open** | Each `MarkdownRenderChild` owns its own Cytoscape instance. No cache collision. |
 | **Obsidian Sync delivers sidecar mid-extraction** | Hash check at extraction completion; if the just-arrived sidecar's hash matches what we just extracted, no-op. |
+| **Sidecar `kind` is non-default** (`session-whiteboard`, `rollup`) | v0.1 renders only `kind: "daily-overview"` (or sidecars with `kind` omitted, which default to that). For unsupported kinds, the renderer logs `console.warn("Visual Notes: unsupported sidecar kind '${k}', skipping render")` and skips mounting. The sidecar is preserved unchanged. |
+| **Sidecar `kind` field schema-valid but unknown to plugin** (future kind we don't yet support) | Same as above — log + skip, don't crash. |
+| **API key valid but user hits org quota** (529 overloaded) | Treat as 5xx: bounded retry with backoff, then queue. |
+| **User pastes API key with leading/trailing whitespace** | Trim on save in settings handler. |
 
 ### What we explicitly DON'T handle in v0.1
 
@@ -1021,7 +1117,10 @@ override the whole prompt via settings.
 | **Overview** | The visual concept map rendered for a daily note. |
 | **Session-whiteboard** (legacy) | Per-conversation `{date}-session-{n}.json` sidecars from the original visual-notes skill. **Note:** "session" elsewhere in this doc refers to a conversational unit (an "AI session summary" in a daily note). When ambiguous, use "session-whiteboard" for the file format and "session summary" or "conversation" for the content unit. |
 | **Producer** | Any code that writes a sidecar. The Obsidian plugin and the Claude Code plugin are the two producers. |
-| **`_pinned`** | A boolean field in the sidecar that, when `true`, suppresses LLM extraction by the Obsidian plugin. Used by the Claude Code plugin to claim authoritative ownership of a sidecar. |
+| **`_pinned`** | A boolean field in the sidecar that, when `true`, suppresses LLM extraction by the Obsidian plugin. Used by the Claude Code plugin to claim authoritative ownership of a sidecar. User toggles via the Pin/Unpin commands; force-regenerate command bypasses. |
+| **MarkdownPostProcessor** | Obsidian API hook for post-render content injection. The plugin uses it to inject the Cytoscape canvas into the rendered markdown view of any daily note that has a sidecar. |
+| **MarkdownRenderChild** | Obsidian lifecycle wrapper for rendered content. Each instance owns one Cytoscape canvas and is torn down when the view closes. |
+| **BRAT** | Beta Reviewers Auto-update Tool. The standard Obsidian-plugin distributor for pre-release builds. Users add a repo URL and BRAT pulls the latest tagged release. |
 
 ## Appendix B — Things explicitly cut from MVP
 
