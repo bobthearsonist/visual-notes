@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 import { AnthropicExtractionError, extractGraphFromAnthropic } from "./extractor";
 import { estimateTokens, hashMarkdownSections, sha256Hash } from "./hash";
+import { applyDeterministicLayout } from "./layout";
 import { sidecarPathForMarkdownPath, VisualNotesRenderChild } from "./renderer";
 import { mergeSectionedGraph } from "./sectioned-sidecar";
 import { parseSidecar, type VisualNotesSidecar } from "./schema";
@@ -390,7 +391,7 @@ export default class VisualNotesPlugin extends Plugin {
         force: options.force,
       });
 
-      const stamped: VisualNotesSidecar = {
+      const stamped: VisualNotesSidecar = applyDeterministicLayout({
         kind: "daily-overview",
         title: extracted.title ?? titleForFile(file),
         header: extracted.header ?? "Daily Overview",
@@ -405,7 +406,7 @@ export default class VisualNotesPlugin extends Plugin {
         _usage: extraction.usage
           ? addExtractionUsage(existingSidecar?._usage, extraction.usage)
           : existingSidecar?._usage,
-      };
+      });
 
       await this.app.vault.adapter.write(sidecarPath, `${JSON.stringify(stamped, null, 2)}\n`);
       this.sidecarEvents.trigger("changed", sidecarPath);

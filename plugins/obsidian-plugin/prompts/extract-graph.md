@@ -177,7 +177,10 @@ syntax in the output — labels are plain text.
 - `edges[].classes` — optional. Omit it for the default 2px solid edge.
   `"strong-edge"` = 3px (primary causal/dependency). `"weak-edge"` =
   1px dashed (cross-domain). Do not emit an empty string.
-- `position` — pixel coordinates per layout rules below.
+- `position` — pixel coordinates per layout rules below. These seed positions
+  are still required by the sidecar schema, but the Obsidian plugin
+  deterministically normalizes them by cluster, node type, status, and graph
+  degree before writing/rendering so daily overviews stay readable.
 
 **Don't emit** `_lastProcessedHash`, `_sections`, `_extractedBy`,
 `_pinned`, `_schemaVersion` — those are stamped by the producer
