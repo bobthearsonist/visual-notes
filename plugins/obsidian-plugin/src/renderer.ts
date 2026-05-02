@@ -1,6 +1,7 @@
 import cytoscape from "cytoscape";
 import { EventRef, MarkdownRenderChild, normalizePath } from "obsidian";
 import type VisualNotesPlugin from "./main";
+import { applyDeterministicLayout } from "./layout";
 import { parseSidecar, type VisualNotesSidecar } from "./schema";
 
 export function sidecarPathForMarkdownPath(path: string): string {
@@ -71,7 +72,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
         return;
       }
 
-      this.renderGraph(sidecar);
+      this.renderGraph(applyDeterministicLayout(sidecar));
     } catch (error) {
       this.plugin.log("error", "Failed to render sidecar.", { sidecarPath: this.sidecarPath, error });
       this.showPlaceholder("Visual Notes: malformed sidecar. See console for details.");

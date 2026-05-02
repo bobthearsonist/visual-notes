@@ -2,15 +2,16 @@
 
 The primary artifact of the [Visual Notes](../..) project. Watches daily
 notes in a configured folder, calls the Claude API to extract a concept-map
-graph from the markdown, and renders an interactive Cytoscape visual at
-the top of the rendered note view.
+graph from the markdown, applies a deterministic layout pass, and renders an
+interactive Cytoscape visual at the top of the rendered note view.
 
 ## Status
 
 🚧 **MVP implementation in progress.** The plugin includes the Obsidian build
 scaffold, settings tab, manual and watched-folder extraction, sidecar writing,
-pin/unpin/delete commands, status-bar extraction count, token-usage metadata,
-and inline Cytoscape rendering from the sidecar.
+section-aware sidecar metadata, deterministic layout, pin/unpin/delete commands,
+status-bar extraction count, token-usage metadata, and inline Cytoscape
+rendering from the sidecar.
 
 The top-level [`../../README.md`](../../README.md) has the product and
 architecture overview. The living [`../../docs/design.md`](../../docs/design.md)
