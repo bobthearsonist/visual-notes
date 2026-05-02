@@ -26,6 +26,104 @@
   margin-top: 0.25rem;
 }
 
+.visual-notes-usage {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-top: 0.35rem;
+}
+
+.visual-notes-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0 1rem 0.75rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.visual-notes-legend-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.visual-notes-legend-label {
+  margin-right: 0.1rem;
+  color: var(--text-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.visual-notes-legend-item {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.visual-notes-legend-swatch {
+  box-sizing: border-box;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.visual-notes-legend-status-completed {
+  background: #a6e3a1;
+  border-color: #40a02b;
+}
+
+.visual-notes-legend-status-active {
+  background: #f9e2af;
+  border-color: #df8e1d;
+}
+
+.visual-notes-legend-status-context {
+  background: #89b4fa;
+  border-color: #1e66f5;
+}
+
+.visual-notes-legend-status-blocked {
+  background: #f38ba8;
+  border-color: #d20f39;
+}
+
+.visual-notes-legend-type-system {
+  border-radius: 0.2rem;
+}
+
+.visual-notes-legend-type-task {
+  border-radius: 999px;
+}
+
+.visual-notes-legend-type-decision {
+  width: 0.6rem;
+  height: 0.6rem;
+  margin: 0 0.075rem;
+  transform: rotate(45deg);
+}
+
+.visual-notes-legend-edge-strong,
+.visual-notes-legend-edge-weak {
+  width: 1.2rem;
+  height: 0;
+  border: 0;
+  border-top: 2px solid var(--text-muted);
+  background: transparent;
+}
+
+.visual-notes-legend-edge-strong {
+  border-top-width: 3px;
+  border-top-color: var(--text-normal);
+}
+
+.visual-notes-legend-edge-weak {
+  border-top-style: dashed;
+}
+
 .visual-notes-graph {
   height: 450px;
   min-height: 320px;

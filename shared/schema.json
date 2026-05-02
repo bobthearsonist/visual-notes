@@ -45,6 +45,48 @@
       "default": false,
       "description": "When true, suppresses automatic re-extraction by the Obsidian plugin. The Claude Code plugin sets this to claim authoritative ownership of the sidecar (deliberate, curated content); the Obsidian plugin honors it on read. Land this in v0.1, not deferred to a future release."
     },
+    "_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Plugin-maintained extraction usage metadata. The LLM should omit this field; the Obsidian plugin stamps it from Anthropic API response usage and carries cumulative totals forward across sidecar rewrites.",
+      "required": ["currency", "last", "cumulative"],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "const": "USD"
+        },
+        "last": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "inputTokens", "outputTokens", "totalTokens", "estimatedCostUsd"],
+          "properties": {
+            "model": { "type": "string", "minLength": 1 },
+            "inputTokens": { "type": "integer", "minimum": 0 },
+            "outputTokens": { "type": "integer", "minimum": 0 },
+            "totalTokens": { "type": "integer", "minimum": 0 },
+            "estimatedCostUsd": { "type": "number", "minimum": 0 }
+          }
+        },
+        "cumulative": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "extractions",
+            "inputTokens",
+            "outputTokens",
+            "totalTokens",
+            "estimatedCostUsd"
+          ],
+          "properties": {
+            "extractions": { "type": "integer", "minimum": 0 },
+            "inputTokens": { "type": "integer", "minimum": 0 },
+            "outputTokens": { "type": "integer", "minimum": 0 },
+            "totalTokens": { "type": "integer", "minimum": 0 },
+            "estimatedCostUsd": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
     "nodes": {
       "type": "array",
       "minItems": 1,

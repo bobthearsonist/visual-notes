@@ -18,6 +18,7 @@ import {
   VisualNotesSettingTab,
   type VisualNotesSettings,
 } from "./settings";
+import { addExtractionUsage } from "./usage";
 
 const PRODUCER_ID = "obsidian-plugin@0.1.0";
 const MAX_INPUT_TOKENS = 100_000;
@@ -373,12 +374,13 @@ export default class VisualNotesPlugin extends Plugin {
     this.updateStatusBar();
 
     try {
-      const extracted = await extractGraphFromAnthropic({
+      const extraction = await extractGraphFromAnthropic({
         apiKey: this.settings.anthropicApiKey,
         model: this.settings.model,
         markdown,
         sourcePath: file.path,
       });
+      const extracted = extraction.graph;
 
       const stamped: VisualNotesSidecar = {
         kind: "daily-overview",
@@ -391,6 +393,9 @@ export default class VisualNotesPlugin extends Plugin {
         _extractedBy: PRODUCER_ID,
         _schemaVersion: SETTINGS_VERSION,
         _pinned: options.force ? false : existingSidecar?._pinned ?? false,
+        _usage: extraction.usage
+          ? addExtractionUsage(existingSidecar?._usage, extraction.usage)
+          : existingSidecar?._usage,
       };
 
       await this.app.vault.adapter.write(sidecarPath, `${JSON.stringify(stamped, null, 2)}\n`);

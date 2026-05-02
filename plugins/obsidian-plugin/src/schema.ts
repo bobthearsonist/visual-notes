@@ -8,6 +8,27 @@ const nodeIdSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const edgeClassSchema = z.enum(["strong-edge", "weak-edge"]);
 const sidecarKindSchema = z.enum(["daily-overview", "session-whiteboard", "rollup"]);
 
+const tokenUsageSchema = z
+  .object({
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+    totalTokens: z.number().int().nonnegative(),
+    estimatedCostUsd: z.number().nonnegative(),
+  })
+  .strict();
+
+const usageSchema = z
+  .object({
+    currency: z.literal("USD"),
+    last: tokenUsageSchema.extend({
+      model: z.string().min(1),
+    }),
+    cumulative: tokenUsageSchema.extend({
+      extractions: z.number().int().nonnegative(),
+    }),
+  })
+  .strict();
+
 export const graphNodeSchema = z
   .object({
     data: z
@@ -52,6 +73,7 @@ export const sidecarSchema = z
       .optional(),
     _schemaVersion: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),
     _pinned: z.boolean().optional(),
+    _usage: usageSchema.optional(),
     nodes: z.array(graphNodeSchema).min(1).max(50),
     edges: z.array(graphEdgeSchema).max(100),
   })
@@ -81,6 +103,7 @@ export const sidecarSchema = z
 export type VisualNotesSidecar = z.infer<typeof sidecarSchema>;
 export type VisualNotesNode = z.infer<typeof graphNodeSchema>;
 export type VisualNotesEdge = z.infer<typeof graphEdgeSchema>;
+export type VisualNotesUsage = z.infer<typeof usageSchema>;
 
 export function parseSidecar(value: unknown): VisualNotesSidecar {
   return sidecarSchema.parse(value);

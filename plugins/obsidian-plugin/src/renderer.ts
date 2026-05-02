@@ -93,6 +93,19 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       header.createDiv({ cls: "visual-notes-subtitle", text: sidecar.subtitle });
     }
 
+    if (sidecar._usage) {
+      header.createDiv({
+        cls: "visual-notes-usage",
+        text: `Last: ${formatTokenSummary(sidecar._usage.last)} (${formatUsd(
+          sidecar._usage.last.estimatedCostUsd,
+        )}) · Cumulative: ${formatTokenSummary(sidecar._usage.cumulative)} (${formatUsd(
+          sidecar._usage.cumulative.estimatedCostUsd,
+        )}) across ${sidecar._usage.cumulative.extractions} extraction${sidecar._usage.cumulative.extractions === 1 ? "" : "s"}`,
+      });
+    }
+
+    this.renderLegend();
+
     const graphEl = this.containerEl.createDiv({ cls: "visual-notes-graph" });
     const elements: cytoscape.ElementDefinition[] = [
       ...sidecar.nodes.map((node) => ({
@@ -115,6 +128,42 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       style: this.createStyle(),
       minZoom: 0.3,
       maxZoom: 3,
+    });
+  }
+
+  private renderLegend(): void {
+    const legend = this.containerEl.createDiv({ cls: "visual-notes-legend" });
+    legend.setAttribute("aria-label", "Visual Notes legend");
+
+    this.renderLegendGroup(legend, "Status", [
+      ["visual-notes-legend-status-completed", "done"],
+      ["visual-notes-legend-status-active", "active"],
+      ["visual-notes-legend-status-context", "context"],
+      ["visual-notes-legend-status-blocked", "blocked"],
+    ]);
+    this.renderLegendGroup(legend, "Type", [
+      ["visual-notes-legend-type-system", "system"],
+      ["visual-notes-legend-type-task", "task"],
+      ["visual-notes-legend-type-decision", "decision"],
+    ]);
+    this.renderLegendGroup(legend, "Edge", [
+      ["visual-notes-legend-edge-strong", "strong"],
+      ["visual-notes-legend-edge-weak", "weak"],
+    ]);
+  }
+
+  private renderLegendGroup(
+    legend: HTMLElement,
+    title: string,
+    items: Array<[swatchClass: string, label: string]>,
+  ): void {
+    const group = legend.createDiv({ cls: "visual-notes-legend-group" });
+    group.createDiv({ cls: "visual-notes-legend-label", text: title });
+
+    items.forEach(([swatchClass, label]) => {
+      const item = group.createDiv({ cls: "visual-notes-legend-item" });
+      item.createDiv({ cls: `visual-notes-legend-swatch ${swatchClass}` });
+      item.createDiv({ cls: "visual-notes-legend-text", text: label });
     });
   }
 
@@ -275,4 +324,30 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
 
 function getCssVariable(computed: CSSStyleDeclaration, name: string, fallback: string): string {
   return computed.getPropertyValue(name).trim() || fallback;
+}
+
+function formatTokens(value: number): string {
+  return Math.round(value).toLocaleString();
+}
+
+function formatTokenSummary(usage: {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}): string {
+  return `${formatTokens(usage.totalTokens)} tokens (${formatTokens(usage.inputTokens)} in / ${formatTokens(
+    usage.outputTokens,
+  )} out)`;
+}
+
+function formatUsd(value: number): string {
+  if (value < 0.001) {
+    return `$${value.toFixed(6)}`;
+  }
+
+  if (value < 1) {
+    return `$${value.toFixed(4)}`;
+  }
+
+  return `$${value.toFixed(2)}`;
 }
