@@ -11,6 +11,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   private cy: cytoscape.Core | null = null;
   private sidecarEventRef: EventRef | null = null;
   private readonly sidecarPath: string;
+  private readonly sourcePath: string;
 
   constructor(
     containerEl: HTMLElement,
@@ -18,11 +19,13 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     sourcePath: string,
   ) {
     super(containerEl);
+    this.sourcePath = sourcePath;
     this.sidecarPath = sidecarPathForMarkdownPath(sourcePath);
   }
 
   onload(): void {
     this.moveContainerToPreviewSection();
+    this.removeDuplicateContainersForSource();
     this.sidecarEventRef = this.plugin.sidecarEvents.on("changed", (sidecarPath: unknown) => {
       if (typeof sidecarPath === "string" && normalizePath(sidecarPath) === this.sidecarPath) {
         void this.render();
@@ -34,8 +37,22 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
+    const previewRoot = this.containerEl.closest(".markdown-preview-view");
     this.destroyGraph();
+    this.plugin.unmarkMountedSourcePath(this.sourcePath);
+    if (
+      previewRoot instanceof HTMLElement &&
+      previewRoot.dataset.visualNotesSourcePath === this.sourcePath
+    ) {
+      delete previewRoot.dataset.visualNotesSourcePath;
+    }
+    this.containerEl.remove();
     this.sidecarEventRef = null;
+  }
+
+  async refresh(): Promise<void> {
+    this.removeDuplicateContainersForSource();
+    await this.render();
   }
 
   private async render(): Promise<void> {
@@ -64,6 +81,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   private renderGraph(sidecar: VisualNotesSidecar): void {
+    this.removeDuplicateContainersForSource();
     this.destroyGraph();
     this.prepareVisibleContainer();
 
@@ -249,6 +267,18 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     if (section instanceof HTMLElement && this.containerEl.parentElement !== section) {
       section.prepend(this.containerEl);
     }
+  }
+
+  private removeDuplicateContainersForSource(): void {
+    Array.from(document.querySelectorAll(".visual-notes-container")).forEach((container) => {
+      if (
+        container !== this.containerEl &&
+        container instanceof HTMLElement &&
+        container.dataset.visualNotesSourcePath === this.sourcePath
+      ) {
+        container.remove();
+      }
+    });
   }
 }
 

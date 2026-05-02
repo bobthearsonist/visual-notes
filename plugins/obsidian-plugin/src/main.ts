@@ -35,11 +35,12 @@ export default class VisualNotesPlugin extends Plugin {
 
   private readonly debounceTimers = new Map<string, DebouncedExtraction>();
   private readonly forceRegenerateCooldowns = new Map<string, number>();
-  private readonly mountedDocIds = new Set<string>();
+  private readonly mountedSourcePaths = new Set<string>();
   private statusBarEl: HTMLElement | null = null;
   private activeExtractions = 0;
 
   async onload(): Promise<void> {
+    document.querySelectorAll(".visual-notes-container").forEach((container) => container.remove());
     await this.loadSettings();
     this.addSettingTab(new VisualNotesSettingTab(this.app, this));
     this.statusBarEl = this.addStatusBarItem();
@@ -71,6 +72,7 @@ export default class VisualNotesPlugin extends Plugin {
   onunload(): void {
     this.debounceTimers.forEach((timer) => timer.cancel());
     this.debounceTimers.clear();
+    this.mountedSourcePaths.clear();
   }
 
   async loadSettings(): Promise<void> {
@@ -102,6 +104,10 @@ export default class VisualNotesPlugin extends Plugin {
     }
 
     console[level](prefix, data);
+  }
+
+  unmarkMountedSourcePath(sourcePath: string): void {
+    this.mountedSourcePaths.delete(sourcePath);
   }
 
   private registerCommands(): void {
@@ -147,8 +153,21 @@ export default class VisualNotesPlugin extends Plugin {
   }
 
   private mountVisualNotesContainer(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
-    if (this.mountedDocIds.has(ctx.docId) || el.classList.contains("mod-frontmatter")) {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!(activeFile instanceof TFile) || activeFile.path !== ctx.sourcePath) {
       return;
+    }
+
+    if (el.classList.contains("mod-frontmatter")) {
+      return;
+    }
+
+    if (this.hasLiveContainerForSource(ctx.sourcePath)) {
+      return;
+    }
+
+    if (this.mountedSourcePaths.has(ctx.sourcePath)) {
+      this.mountedSourcePaths.delete(ctx.sourcePath);
     }
 
     const section =
@@ -164,11 +183,36 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
+    const previewRoot = section.closest(".markdown-preview-view") ?? section;
+    const rootDataset = previewRoot instanceof HTMLElement ? previewRoot.dataset : null;
+    if (rootDataset?.visualNotesSourcePath === ctx.sourcePath) {
+      return;
+    }
+
     const container = document.createElement("div");
     container.classList.add("visual-notes-container");
+    container.dataset.visualNotesSourcePath = ctx.sourcePath;
+    if (rootDataset) {
+      rootDataset.visualNotesSourcePath = ctx.sourcePath;
+    }
     section.prepend(container);
-    this.mountedDocIds.add(ctx.docId);
-    ctx.addChild(new VisualNotesRenderChild(container, this, ctx.sourcePath));
+    this.mountedSourcePaths.add(ctx.sourcePath);
+    const child = new VisualNotesRenderChild(container, this, ctx.sourcePath);
+    ctx.addChild(child);
+    window.requestAnimationFrame(() => {
+      if (container.isConnected && container.childElementCount === 0) {
+        void child.refresh();
+      }
+    });
+  }
+
+  private hasLiveContainerForSource(sourcePath: string): boolean {
+    return Array.from(document.querySelectorAll(".visual-notes-container")).some(
+      (container) =>
+        container instanceof HTMLElement &&
+        container.isConnected &&
+        container.dataset.visualNotesSourcePath === sourcePath,
+    );
   }
 
   private withActiveMarkdownFile(
