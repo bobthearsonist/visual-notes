@@ -12,7 +12,16 @@
 }
 
 .visual-notes-header {
-  padding: 0.75rem 1rem 0.25rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
+.visual-notes-heading {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .visual-notes-title {
@@ -27,26 +36,31 @@
 }
 
 .visual-notes-usage {
+  border-top: 1px solid var(--background-modifier-border);
+  padding: 0.5rem 1rem 0.65rem;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  margin-top: 0.35rem;
 }
 
 .visual-notes-legend {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  align-items: center;
-  padding: 0 1rem 0.75rem;
+  flex: 0 1 34rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0;
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
+  text-align: right;
 }
 
 .visual-notes-legend-group {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.25rem 0.35rem;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .visual-notes-legend-label {

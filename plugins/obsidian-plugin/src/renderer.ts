@@ -84,27 +84,17 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.prepareVisibleContainer();
 
     const header = this.containerEl.createDiv({ cls: "visual-notes-header" });
-    header.createDiv({
+    const heading = header.createDiv({ cls: "visual-notes-heading" });
+    heading.createDiv({
       cls: "visual-notes-title",
       text: sidecar.header ?? sidecar.title ?? "Daily Overview",
     });
 
     if (sidecar.subtitle) {
-      header.createDiv({ cls: "visual-notes-subtitle", text: sidecar.subtitle });
+      heading.createDiv({ cls: "visual-notes-subtitle", text: sidecar.subtitle });
     }
 
-    if (sidecar._usage) {
-      header.createDiv({
-        cls: "visual-notes-usage",
-        text: `Last: ${formatTokenSummary(sidecar._usage.last)} (${formatUsd(
-          sidecar._usage.last.estimatedCostUsd,
-        )}) · Cumulative: ${formatTokenSummary(sidecar._usage.cumulative)} (${formatUsd(
-          sidecar._usage.cumulative.estimatedCostUsd,
-        )}) across ${sidecar._usage.cumulative.extractions} extraction${sidecar._usage.cumulative.extractions === 1 ? "" : "s"}`,
-      });
-    }
-
-    this.renderLegend();
+    this.renderLegend(header);
 
     const graphEl = this.containerEl.createDiv({ cls: "visual-notes-graph" });
     const elements: cytoscape.ElementDefinition[] = [
@@ -129,10 +119,21 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       minZoom: 0.3,
       maxZoom: 3,
     });
+
+    if (sidecar._usage) {
+      this.containerEl.createDiv({
+        cls: "visual-notes-usage",
+        text: `Last: ${formatTokenSummary(sidecar._usage.last)} (${formatUsd(
+          sidecar._usage.last.estimatedCostUsd,
+        )}) · Cumulative: ${formatTokenSummary(sidecar._usage.cumulative)} (${formatUsd(
+          sidecar._usage.cumulative.estimatedCostUsd,
+        )}) across ${sidecar._usage.cumulative.extractions} extraction${sidecar._usage.cumulative.extractions === 1 ? "" : "s"}`,
+      });
+    }
   }
 
-  private renderLegend(): void {
-    const legend = this.containerEl.createDiv({ cls: "visual-notes-legend" });
+  private renderLegend(parent: HTMLElement): void {
+    const legend = parent.createDiv({ cls: "visual-notes-legend" });
     legend.setAttribute("aria-label", "Visual Notes legend");
 
     this.renderLegendGroup(legend, "Status", [
