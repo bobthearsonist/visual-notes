@@ -34,8 +34,10 @@ Use specific verb phrases: `caused by`, `blocks`, `is part of`, `led to`,
 `limits effectiveness of`, `ends loop`, `exploits`, `complicated by`.
 
 **Forbidden generic edge labels:** `relates to`, `connects with`, `is
-about`, `concerns`, `involves`. If you'd reach for one of these, re-read
-the source — there's a more specific verb hiding.
+about`, `concerns`, `involves`, bare `uses`, bare `has`, bare `with`.
+Qualified forms are fine (`uses OAuth flow`, `shares settings.json with`).
+If you'd reach for a bare filler verb, re-read the source — there's a
+more specific verb hiding.
 
 ### 2. Hierarchy encodes importance
 
@@ -57,6 +59,14 @@ rejects it. **Cluster aggressively:**
 
 This is a hard rule, not advice. A flat list of 40 checkboxes → wrong;
 a single cluster node `"checklist (40)"` → right.
+
+**Exclusion is also clustering.** Sections that are pure external
+context with no AI-work outcome — pasted meeting notes, dataview
+output, embedded queries, raw command logs — may be **omitted
+entirely** if including them would dilute the day's focus. The visual
+shows the day's *thinking*; not every paragraph in the markdown
+deserves a node. Default: include manual notes that connect to the
+day's work; exclude pure context dumps that don't.
 
 ### 4. Status — apply EXACTLY ONE class per node
 
