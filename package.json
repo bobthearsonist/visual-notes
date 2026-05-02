@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "description": "Living concept map of your daily notes — Obsidian plugin + Claude Code plugin sharing a sidecar JSON schema.",
   "private": true,
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --filter @visual-notes/obsidian-plugin dev",
     "lint": "pnpm -r lint",
     "layout:metrics": "npm --prefix plugins/obsidian-plugin run layout:metrics",
+    "package:obsidian": "pnpm --filter @visual-notes/obsidian-plugin build && node scripts/package-obsidian-plugin.mjs",
+    "validate:obsidian-release": "pnpm package:obsidian",
     "typecheck": "pnpm -r typecheck"
   },
   "keywords": ["obsidian", "claude-code", "concept-map", "visual-notes"],

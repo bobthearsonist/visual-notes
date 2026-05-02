@@ -23,13 +23,31 @@ tracks remaining design work and open decisions.
 
 1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) in Obsidian.
 2. In BRAT settings, add this repository's path:
-   `bobthearsonist/visual-notes` (BRAT supports monorepos via path config —
-   see release notes for the specific tag pattern).
-3. BRAT installs the plugin from the latest `obsidian-v*` release.
+   `bobthearsonist/visual-notes`.
+3. BRAT installs the plugin from the latest GitHub release whose tag exactly
+   matches `manifest.json`'s version.
 
 ### Community plugin store (after first stable release)
 
 Search "Visual Notes" in Obsidian → Settings → Community plugins.
+
+## Release packaging
+
+From the repository root, run:
+
+```bash
+pnpm package:obsidian
+```
+
+This builds the plugin and writes the Obsidian release assets to
+`dist/obsidian-plugin`:
+
+- `manifest.json`
+- `main.js`
+- `styles.css`
+
+See [`../../docs/marketplace-readiness.md`](../../docs/marketplace-readiness.md)
+for the release, tag, and marketplace submission checklist.
 
 ### Manual sideload (development)
 

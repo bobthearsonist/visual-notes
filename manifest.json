@@ -1,0 +1,11 @@
+{
+  "id": "visual-notes",
+  "name": "Visual Notes",
+  "version": "0.1.0",
+  "minAppVersion": "1.11.4",
+  "description": "Living concept map of your daily notes. Watches markdown files, extracts concepts via Claude API, renders Cytoscape inline.",
+  "author": "bobthearsonist",
+  "authorUrl": "https://github.com/bobthearsonist",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
