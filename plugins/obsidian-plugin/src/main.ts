@@ -352,7 +352,7 @@ export default class VisualNotesPlugin extends Plugin {
 
     const hash = await sha256Hash(markdown);
     const sidecarPath = sidecarPathForMarkdownPath(file.path);
-    const existingSidecar = await this.readSidecar(sidecarPath);
+    const existingSidecar = await this.readSidecarForExtraction(sidecarPath, options);
 
     if (!options.force) {
       if (existingSidecar?._pinned) {
@@ -471,6 +471,21 @@ export default class VisualNotesPlugin extends Plugin {
 
     const raw = await this.app.vault.adapter.read(sidecarPath);
     return parseSidecar(JSON.parse(raw));
+  }
+
+  private async readSidecarForExtraction(
+    sidecarPath: string,
+    options: ExtractionOptions,
+  ): Promise<VisualNotesSidecar | null> {
+    try {
+      return await this.readSidecar(sidecarPath);
+    } catch (error) {
+      this.log("warn", "Existing sidecar is malformed; regenerating.", { sidecarPath, error });
+      if (options.manual) {
+        new Notice("Visual Notes: existing sidecar is malformed — regenerating.");
+      }
+      return null;
+    }
   }
 
   private isWatchedFile(file: TFile): boolean {

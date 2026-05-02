@@ -95,9 +95,8 @@ export class VisualNotesSettingTab extends PluginSettingTab {
       button
         .setButtonText("Add folder")
         .setCta()
-        .onClick(async () => {
+        .onClick(() => {
           this.plugin.settings.watchedFolders.push("");
-          await this.plugin.saveSettings();
           this.display();
         });
     });
