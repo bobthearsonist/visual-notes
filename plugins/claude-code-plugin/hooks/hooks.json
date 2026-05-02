@@ -1,0 +1,6 @@
+{
+  "description": "Visual Notes hook: after `obsidian append` to a Captain's Log file, nudge the agent to update the daily-overview sidecar. Migration in progress.",
+  "hooks": {
+    "PostToolUse": []
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bobthearsonist/visual-notes/shared/schema.json",
+  "title": "Visual Notes Sidecar",
+  "description": "Sidecar JSON written next to a daily note describing the extracted concept-map graph. Consumed by both the Obsidian plugin (renders the visual) and the Claude Code plugin (may produce it).",
+  "type": "object",
+  "required": ["nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Visual title (window title equivalent). Auto-derived from filename + date when omitted."
+    },
+    "header": {
+      "type": "string",
+      "description": "Visual header shown top-left of the canvas. Usually 'Daily Overview' or 'Session N'."
+    },
+    "subtitle": {
+      "type": "string",
+      "description": "One-line summary of the day's themes shown under the header."
+    },
+    "_lastProcessedHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the markdown body the sidecar was extracted from. Used to skip redundant API calls when the markdown hasn't changed (handles Obsidian Sync's per-device modify storm)."
+    },
+    "_extractedBy": {
+      "type": "string",
+      "description": "Identifier for the producer that wrote this sidecar, e.g. 'obsidian-plugin@0.1.0' or 'claude-code-plugin@0.1.0'. Useful for debugging which producer wrote a given sidecar."
+    },
+    "_schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version string (semver). Optional in v0.x; required in v1.0+."
+    },
+    "_pinned": {
+      "type": "boolean",
+      "description": "When true, suppresses automatic re-extraction by the Obsidian plugin. Future feature; useful when the user wants to keep an agent-curated sidecar from being overwritten by LLM extraction."
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "description": "Stable kebab-case identifier. Slug of the concept name."
+              },
+              "label": {
+                "type": "string",
+                "description": "Display label. Use \\n for line breaks (target ~2-4 words per line)."
+              }
+            },
+            "additionalProperties": true
+          },
+          "classes": {
+            "type": "string",
+            "description": "Space-separated class list. Combine one type class with one status class. Type: system|task|decision. Status: completed|active|context|blocked.",
+            "examples": ["system completed", "task active", "decision context"]
+          },
+          "position": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            },
+            "description": "Pixel coordinates (LLM-assigned in v0.x; may become optional in future when force-directed layout is supported)."
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["source", "target"],
+            "properties": {
+              "source": { "type": "string", "description": "ID of the source node." },
+              "target": { "type": "string", "description": "ID of the target node." },
+              "label": {
+                "type": "string",
+                "description": "Verb phrase describing the relationship. Required for design quality; not enforced at schema level for forward compatibility."
+              }
+            },
+            "additionalProperties": true
+          },
+          "classes": {
+            "type": "string",
+            "description": "Optional edge style class. Empty/omitted: default 2px solid. 'strong-edge': 3px darker. 'weak-edge': 1px dashed (use for cross-domain connections).",
+            "examples": ["", "strong-edge", "weak-edge"]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@visual-notes/obsidian-plugin",
+  "version": "0.1.0",
+  "description": "Obsidian plugin that watches daily notes and renders an LLM-extracted concept map inline.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "keywords": ["obsidian", "plugin", "concept-map", "visual-notes"],
+  "author": "bobthearsonist",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "cytoscape": "^3.30.0",
+    "zod": "^3.23.0"
+  }
+}

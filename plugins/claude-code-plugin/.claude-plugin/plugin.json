@@ -1,0 +1,13 @@
+{
+  "name": "visual-notes",
+  "description": "Hooks and skills for the Visual Notes concept-map system. Lets AI agents pre-populate sidecar JSONs that the Obsidian plugin renders.",
+  "version": "0.1.0",
+  "author": {
+    "name": "bobthearsonist",
+    "url": "https://github.com/bobthearsonist"
+  },
+  "homepage": "https://github.com/bobthearsonist/visual-notes",
+  "repository": "https://github.com/bobthearsonist/visual-notes",
+  "license": "MIT",
+  "keywords": ["obsidian", "visual-notes", "concept-map", "captains-log"]
+}

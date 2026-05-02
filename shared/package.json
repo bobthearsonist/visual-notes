@@ -1,0 +1,14 @@
+{
+  "name": "@visual-notes/shared",
+  "version": "0.1.0",
+  "description": "Shared sidecar JSON schema consumed by both the Obsidian plugin and the Claude Code plugin.",
+  "private": true,
+  "main": "schema.json",
+  "files": ["schema.json"],
+  "scripts": {
+    "generate-types": "json2ts schema.json > dist/schema.d.ts"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0"
+  }
+}
