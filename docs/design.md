@@ -45,13 +45,13 @@ future work.
 
 ### Section-aware updates
 
-Current extraction reads the whole note and rewrites the whole sidecar. That is
-simple and correct, but it can cost more than necessary and makes every save a
-full-graph regeneration.
+The sidecar schema can carry section provenance so extracted nodes and edges can
+be traced back to markdown sections. Current extraction still reads the whole
+note, but section metadata gives future updates a stable place to preserve
+unchanged sections and strip ambiguous references.
 
 Future design target:
 
-- Track hashes per markdown section, not only per full note.
 - Re-extract only changed sections when the graph can be patched safely.
 - Preserve stable node IDs across partial updates so existing layout and pins
   remain useful.
@@ -63,8 +63,6 @@ Future design target:
 
 Open questions:
 
-- Should the sidecar store a `sections` map with heading slug, source range,
-  hash, and associated node IDs?
 - Should section-level extraction return graph patches, or should the plugin
   ask Claude to merge old graph + changed markdown into a new full graph?
 - How should manual edits to headings affect historical node IDs?
@@ -129,6 +127,7 @@ Current schema supports:
 - `kind`: `daily-overview`, `session-whiteboard`, `rollup`
 - graph nodes with type/status classes and required positions
 - labeled edges with optional strength classes
+- section metadata/provenance for section-aware update workflows
 - producer metadata (`_extractedBy`, `_schemaVersion`)
 - extraction metadata (`_lastProcessedHash`, `_usage`)
 - pinning (`_pinned`)
@@ -222,7 +221,7 @@ Open areas:
 
 | Topic | Current leaning | Decision needed before |
 |---|---|---|
-| Section-aware sidecar metadata | Add after MVP; do not block v0.1 | schema v1 |
+| Section-aware extraction patches | Use sidecar section metadata; keep full-note fallback | schema v1 |
 | Layout algorithm | Keep preset positions; A/B force-directed | stable release |
 | API key storage | Improve desktop storage; document mobile caveat | public beta |
 | Cost dashboard | Keep status count for MVP | after beta feedback |
