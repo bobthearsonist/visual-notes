@@ -31,7 +31,7 @@ flowchart LR
     classDef ai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#111827
     classDef data fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#052e16
     classDef render fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#111827
-    classDef future fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,stroke-dasharray: 5 5,color:#334155
+    classDef future fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,stroke-dasharray: 5,5,color:#334155
 
     subgraph Sources["Everyday note inputs"]
         Manual["Manual notes"]
@@ -238,7 +238,6 @@ visual-notes/
 - [Obsidian plugin README](plugins/obsidian-plugin/README.md)
 - [Claude Code plugin README](plugins/claude-code-plugin/README.md)
 - [Living design document](docs/design.md)
-- [Issue #4: README/design-doc split](https://github.com/bobthearsonist/visual-notes/issues/4)
 - [Project issues](https://github.com/bobthearsonist/visual-notes/issues)
 
 ## License
