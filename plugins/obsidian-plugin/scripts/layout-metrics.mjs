@@ -148,6 +148,7 @@ for (const fixture of fixtures) {
   failures.push(...evaluateFixture(fixture.name, fixture.sidecar));
 }
 failures.push(...evaluateEmptyGraph());
+failures.push(...(await evaluateRenderPersistence()));
 
 if (failures.length > 0) {
   console.error("Layout metrics failed:");
@@ -228,6 +229,29 @@ function evaluateEmptyGraph() {
     )} closePairs=${metrics.closePairCount}`,
   );
   return [];
+}
+
+async function evaluateRenderPersistence() {
+  const rendererSource = await readFile(new URL("../src/renderer.ts", import.meta.url), "utf8");
+  const mainSource = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  const persistenceFailures = [];
+
+  if (rendererSource.includes("applyDeterministicLayout")) {
+    persistenceFailures.push("renderer must not import or call applyDeterministicLayout");
+  }
+  if (!rendererSource.includes("this.renderGraph(sidecar);")) {
+    persistenceFailures.push("renderer must pass parsed sidecar positions directly into renderGraph");
+  }
+  if (!mainSource.includes("applyDeterministicLayout({")) {
+    persistenceFailures.push("extraction/write path must apply deterministic layout before persisting sidecars");
+  }
+
+  console.log("Fixture: render persistence guard");
+  if (persistenceFailures.length === 0) {
+    console.log("After:  renderer preserves stored positions; extraction/write path applies deterministic layout");
+  }
+
+  return persistenceFailures;
 }
 
 function improvement(before, after) {
