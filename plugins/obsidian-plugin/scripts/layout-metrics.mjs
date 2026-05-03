@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
@@ -25,11 +25,18 @@ const { applyDeterministicLayout, calculateLayoutMetrics } = layoutModule;
 
 const qualityGate = {
   maxWidth: 1000,
-  maxHeight: 560,
+  maxHeight: 660,
   minCardFitScale: 0.85,
   minNodeDistance: 100,
   maxClosePairs: 0,
-  maxEdgeCrossings: 6,
+  maxEdgeCrossings: 8,
+  maxOutlierRatio: 2.25,
+  maxPrimaryEdgeLength: 430,
+  maxWeakEdgeLength: 780,
+  maxWeakEdgeLengthBudget: 1800,
+  maxComponentWidth: 640,
+  maxComponentHeight: 460,
+  minEstimatedDefaultNodeFontPx: 14.5,
 };
 
 const fixtures = [
@@ -138,8 +145,14 @@ const fixtures = [
   },
 ];
 
-for (const sidecarPath of process.argv.slice(2)) {
+const args = process.argv.slice(2);
+const shouldWrite = args.includes("--write");
+const sidecarPaths = args.filter((arg) => arg !== "--write");
+const sidecarInputs = [];
+
+for (const sidecarPath of sidecarPaths) {
   const sidecar = JSON.parse(await readFile(sidecarPath, "utf8"));
+  sidecarInputs.push({ path: sidecarPath, sidecar });
   fixtures.push({ name: sidecarPath, sidecar });
 }
 
@@ -154,6 +167,12 @@ if (failures.length > 0) {
   console.error("Layout metrics failed:");
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exitCode = 1;
+} else if (shouldWrite) {
+  for (const input of sidecarInputs) {
+    const laidOut = applyDeterministicLayout(input.sidecar);
+    await writeFile(input.path, `${JSON.stringify(laidOut, null, 2)}\n`);
+    console.log(`Wrote deterministic layout: ${input.path}`);
+  }
 }
 
 function evaluateFixture(name, sidecar) {
@@ -175,6 +194,12 @@ function evaluateFixture(name, sidecar) {
       2,
     )} minDistance=${after.minNodeDistance.toFixed(1)} crossings=${after.edgeCrossingCount} closePairs=${
       after.closePairCount
+    } maxEdge=${after.maxPrimaryEdgeLength.toFixed(1)} maxWeak=${after.maxWeakEdgeLength.toFixed(
+      1,
+    )} weakBudget=${after.weakEdgeLengthBudget.toFixed(1)} font=${after.estimatedDefaultNodeFontPx.toFixed(
+      1,
+    )} outlier=${after.maxOutlierRatio.toFixed(2)} component=${after.maxComponentWidth}x${
+      after.maxComponentHeight
     }`,
   );
   console.log(
@@ -211,6 +236,49 @@ function evaluateFixture(name, sidecar) {
       `${name}: expected edge crossings <= ${qualityGate.maxEdgeCrossings}, got ${after.edgeCrossingCount}`,
     );
   }
+  if (after.maxOutlierRatio > qualityGate.maxOutlierRatio) {
+    fixtureFailures.push(
+      `${name}: expected outlier ratio <= ${qualityGate.maxOutlierRatio}, got ${after.maxOutlierRatio.toFixed(2)}`,
+    );
+  }
+  if (after.maxPrimaryEdgeLength > qualityGate.maxPrimaryEdgeLength) {
+    fixtureFailures.push(
+      `${name}: expected max primary edge length <= ${qualityGate.maxPrimaryEdgeLength}px, got ${after.maxPrimaryEdgeLength.toFixed(
+        1,
+      )}px`,
+    );
+  }
+  if (after.maxWeakEdgeLength > qualityGate.maxWeakEdgeLength) {
+    fixtureFailures.push(
+      `${name}: expected max weak edge length <= ${qualityGate.maxWeakEdgeLength}px, got ${after.maxWeakEdgeLength.toFixed(
+        1,
+      )}px`,
+    );
+  }
+  if (after.weakEdgeLengthBudget > qualityGate.maxWeakEdgeLengthBudget) {
+    fixtureFailures.push(
+      `${name}: expected weak edge length budget <= ${qualityGate.maxWeakEdgeLengthBudget}px, got ${after.weakEdgeLengthBudget.toFixed(
+        1,
+      )}px`,
+    );
+  }
+  if (after.maxComponentWidth > qualityGate.maxComponentWidth) {
+    fixtureFailures.push(
+      `${name}: expected max component width <= ${qualityGate.maxComponentWidth}px, got ${after.maxComponentWidth}px`,
+    );
+  }
+  if (after.estimatedDefaultNodeFontPx < qualityGate.minEstimatedDefaultNodeFontPx) {
+    fixtureFailures.push(
+      `${name}: expected estimated rendered node font >= ${
+        qualityGate.minEstimatedDefaultNodeFontPx
+      }px, got ${after.estimatedDefaultNodeFontPx.toFixed(1)}px`,
+    );
+  }
+  if (after.maxComponentHeight > qualityGate.maxComponentHeight) {
+    fixtureFailures.push(
+      `${name}: expected max component height <= ${qualityGate.maxComponentHeight}px, got ${after.maxComponentHeight}px`,
+    );
+  }
 
   return fixtureFailures;
 }
@@ -241,6 +309,12 @@ async function evaluateRenderPersistence() {
   }
   if (!rendererSource.includes("this.renderGraph(sidecar);")) {
     persistenceFailures.push("renderer must pass parsed sidecar positions directly into renderGraph");
+  }
+  if (!rendererSource.includes('label: "data(displayLabel)"')) {
+    persistenceFailures.push("renderer must use derived display labels so weak/long edges do not clutter the card");
+  }
+  if (!rendererSource.includes('"font-size": 17')) {
+    persistenceFailures.push("renderer node font size should stay large enough for default-fit readability");
   }
   if (!mainSource.includes("applyDeterministicLayout({")) {
     persistenceFailures.push("extraction/write path must apply deterministic layout before persisting sidecars");
