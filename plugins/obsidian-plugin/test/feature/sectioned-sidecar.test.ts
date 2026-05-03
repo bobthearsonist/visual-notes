@@ -98,6 +98,40 @@ test("mergeSectionedGraph assigns unattributed single-section extraction determi
   assert.deepEqual(result.sections[0].nodeIds, ["meeting-action"]);
 });
 
+test("mergeSectionedGraph replaces existing graph when force is true", () => {
+  const sections = [
+    section("document", "Document", 0, HASH_A),
+    section("h1-daily-h2-stable", "Stable", 1, HASH_B),
+  ];
+  const existing = sidecar({
+    nodes: [node("old-node", "Old node", "h1-daily-h2-stable", { x: 111, y: 222 })],
+    edges: [],
+    sections: [
+      metadata(sections[0], [], []),
+      metadata(sections[1], ["old-node"], []),
+    ],
+  });
+
+  const result = mergeSectionedGraph({
+    existing,
+    force: true,
+    sections,
+    extracted: {
+      nodes: [node("new-node", "New node", "h1-daily-h2-stable", { x: 999, y: 888 })],
+      edges: [],
+    },
+  });
+
+  assert.deepEqual(
+    result.nodes.map((entry) => [entry.data.id, entry.position]),
+    [["new-node", { x: 999, y: 888 }]],
+  );
+  assert.deepEqual(
+    result.sections.find((entry) => entry.id === "h1-daily-h2-stable")?.nodeIds,
+    ["new-node"],
+  );
+});
+
 test("mergeSectionedGraph strips invalid section references when attribution is ambiguous", () => {
   const sections = [
     section("h1-alpha", "Alpha", 0, HASH_A),
