@@ -22,7 +22,7 @@
   <circle cx="88" cy="59" r="7" fill="#f59e0b"/>
   <circle cx="112" cy="59" r="7" fill="#22c55e"/>
   <text x="56" y="123" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="700">Test Vault</text>
-  <text x="74" y="164" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="13">0 Daily ADHD Brain Logs</text>
+  <text x="74" y="164" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="13">Daily Notes</text>
   <rect x="56" y="185" width="184" height="34" rx="8" fill="#334155"/>
   <text x="74" y="207" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="13">20260502.md</text>
   <text x="74" y="246" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="13">20260502-overview.json</text>
@@ -33,7 +33,7 @@
   <text x="1120" y="65" fill="#4f46e5" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="700">Reading view</text>
 
   <g transform="translate(310 118)">
-    <text x="0" y="0" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="800">Daily ADHD Brain Log</text>
+    <text x="0" y="0" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="800">Daily Notes</text>
     <rect x="0" y="30" width="860" height="26" rx="8" fill="#f1f5f9"/>
     <text x="14" y="48" fill="#64748b" font-family="Inter, Arial, sans-serif" font-size="13">tags: daily, work, visual-notes • created: 2026-05-02</text>
 
