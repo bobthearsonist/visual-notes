@@ -415,32 +415,14 @@ function buildStoryGroups(
     nodesByRoot.set(root, groupNodes);
   });
 
-  return Array.from(nodesByRoot.values())
-    .reduce<VisualNotesNode[][]>((groups, groupNodes) => {
-      if (groupNodes.length > 1) {
-        groups.push(groupNodes);
-        return groups;
-      }
+  const groupedNodes = Array.from(nodesByRoot.values());
+  const storyGroups = groupedNodes.filter((groupNodes) => groupNodes.length > 1);
+  const singletonStory = groupedNodes.flatMap((groupNodes) =>
+    groupNodes.length === 1 ? groupNodes : [],
+  );
 
-      const singletonGroup = groups.find((group) => group.length > 0 && group[0]?.data.id === "__singletons__");
-      if (singletonGroup) {
-        singletonGroup.push(groupNodes[0]);
-      } else {
-        groups.push([
-          {
-            ...groupNodes[0],
-            data: { id: "__singletons__", label: "Cross-cutting\ninsights" },
-          },
-          groupNodes[0],
-        ]);
-      }
-
-      return groups;
-    }, [])
-    .map((groupNodes) =>
-      groupNodes[0]?.data.id === "__singletons__" ? groupNodes.slice(1) : groupNodes,
-    )
-    .filter((groupNodes) => groupNodes.length > 1)
+  return [...storyGroups, singletonStory]
+    .filter((groupNodes) => groupNodes.length > 0)
     .sort((left, right) => {
       const leftPosition = groupTopLeft(left);
       const rightPosition = groupTopLeft(right);
