@@ -3,8 +3,8 @@ import type { VisualNotesEdge, VisualNotesNode, VisualNotesSidecar } from "./sch
 const CANVAS_START_X = 80;
 const CANVAS_START_Y = 90;
 const STORY_SLOT_X = 200;
-const STORY_SLOT_Y = 145;
-const COMPONENT_GAP_X = 240;
+const STORY_SLOT_Y = 140;
+const COMPONENT_GAP_X = 190;
 const COMPONENT_GAP_Y = 110;
 const READABLE_CARD_WIDTH = 880;
 const READABLE_CARD_HEIGHT = 700;
@@ -198,7 +198,7 @@ function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Visual
 
   const primaryEdges = getPrimaryEdges(edges);
   const infoById = buildInfoById(nodes, edges);
-  const components = findComponents(nodes, primaryEdges, infoById);
+  const components = buildVisualComponents(nodes, primaryEdges, edges, infoById);
   const packedPositions = packStoryClusters(
     components.map((component) => ({
       component,
@@ -409,6 +409,85 @@ function packStoryClusters(layouts: LaidOutComponent[]): Map<string, Position> {
   });
 
   return packedPositions;
+}
+
+function buildVisualComponents(
+  nodes: VisualNotesNode[],
+  primaryEdges: VisualNotesEdge[],
+  edges: VisualNotesEdge[],
+  infoById: Map<string, NodeInfo>,
+): Component[] {
+  const components = findComponents(nodes, primaryEdges, infoById);
+  const storyComponents = components.filter((component) => component.nodes.length > 1);
+  const singletonNodes = components
+    .filter((component) => component.nodes.length === 1)
+    .flatMap((component) => component.nodes);
+
+  if (singletonNodes.length === 0 || storyComponents.length === 0) {
+    return components;
+  }
+
+  const storyByAnchorId = new Map(
+    storyComponents.map((component): [string, NodeInfo[]] => [component.anchorId, [...component.nodes]]),
+  );
+  const componentByNodeId = new Map<string, Component>();
+  storyComponents.forEach((component) => {
+    component.nodes.forEach((node) => componentByNodeId.set(node.id, component));
+  });
+
+  singletonNodes.forEach((node) => {
+    const target = findSingletonStoryTarget(node, storyComponents, componentByNodeId, edges);
+    storyByAnchorId.get(target.anchorId)?.push(node);
+  });
+
+  return Array.from(storyByAnchorId.entries()).map(([anchorId, storyNodes]) => ({
+    nodes: sortNodes(storyNodes),
+    score: componentScore(storyNodes),
+    anchorId,
+  })).sort(
+    (a, b) =>
+      b.nodes.length - a.nodes.length ||
+      b.score - a.score ||
+      a.anchorId.localeCompare(b.anchorId),
+  );
+}
+
+function findSingletonStoryTarget(
+  node: NodeInfo,
+  storyComponents: Component[],
+  componentByNodeId: Map<string, Component>,
+  edges: VisualNotesEdge[],
+): Component {
+  const connectedStory = edges
+    .map((edge) => {
+      if (edge.data.source === node.id) {
+        return componentByNodeId.get(edge.data.target);
+      }
+      if (edge.data.target === node.id) {
+        return componentByNodeId.get(edge.data.source);
+      }
+      return undefined;
+    })
+    .filter((component): component is Component => Boolean(component))
+    .sort((a, b) => b.score - a.score)[0];
+
+  if (connectedStory) {
+    return connectedStory;
+  }
+
+  return (
+    [...storyComponents]
+      .filter((component) => Math.min(...component.nodes.map((storyNode) => storyNode.index)) <= node.index)
+      .sort(
+        (a, b) =>
+          Math.abs(node.index - maxNodeIndex(a)) - Math.abs(node.index - maxNodeIndex(b)) ||
+          b.score - a.score,
+      )[0] ?? storyComponents[0]
+  );
+}
+
+function maxNodeIndex(component: Component): number {
+  return Math.max(...component.nodes.map((node) => node.index));
 }
 
 function pullWeakAttachmentsClose(

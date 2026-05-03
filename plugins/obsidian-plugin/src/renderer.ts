@@ -275,7 +275,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
           "border-width": 1,
           "border-style": "dashed",
           color: theme.muted,
-          label: "data(displayLabel)",
+          label: "",
           "font-family": "sans-serif",
           "font-size": 13,
           "font-weight": 700,
@@ -416,6 +416,30 @@ function buildStoryGroups(
   });
 
   return Array.from(nodesByRoot.values())
+    .reduce<VisualNotesNode[][]>((groups, groupNodes) => {
+      if (groupNodes.length > 1) {
+        groups.push(groupNodes);
+        return groups;
+      }
+
+      const singletonGroup = groups.find((group) => group.length > 0 && group[0]?.data.id === "__singletons__");
+      if (singletonGroup) {
+        singletonGroup.push(groupNodes[0]);
+      } else {
+        groups.push([
+          {
+            ...groupNodes[0],
+            data: { id: "__singletons__", label: "Cross-cutting\ninsights" },
+          },
+          groupNodes[0],
+        ]);
+      }
+
+      return groups;
+    }, [])
+    .map((groupNodes) =>
+      groupNodes[0]?.data.id === "__singletons__" ? groupNodes.slice(1) : groupNodes,
+    )
     .filter((groupNodes) => groupNodes.length > 1)
     .sort((left, right) => {
       const leftPosition = groupTopLeft(left);
@@ -426,10 +450,17 @@ function buildStoryGroups(
       const anchor = selectStoryGroupAnchor(groupNodes);
       return {
         id: `story-card-${index + 1}`,
-        label: `Story ${index + 1}: ${firstLabelLine(anchor.data.label)}`,
+        label: isSingletonStory(groupNodes, primaryEdges)
+          ? `Story ${index + 1}: Cross-cutting insights`
+          : `Story ${index + 1}: ${firstLabelLine(anchor.data.label)}`,
         nodeIds: groupNodes.map((node) => node.data.id),
       };
     });
+}
+
+function isSingletonStory(nodes: VisualNotesNode[], primaryEdges: VisualNotesSidecar["edges"]): boolean {
+  const ids = new Set(nodes.map((node) => node.data.id));
+  return primaryEdges.every((edge) => !ids.has(edge.data.source) || !ids.has(edge.data.target));
 }
 
 function selectStoryGroupAnchor(nodes: VisualNotesNode[]): VisualNotesNode {
