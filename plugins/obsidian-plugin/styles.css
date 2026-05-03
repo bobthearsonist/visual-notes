@@ -139,8 +139,8 @@
 }
 
 .visual-notes-graph {
-  height: min(76vh, 720px);
-  min-height: 640px;
+  height: min(70vh, 660px);
+  min-height: 560px;
   width: 100%;
 }
 
