@@ -32,12 +32,14 @@ function requireExistingFile(path) {
     return;
   }
 
-  if (!statSync(path).isFile()) {
+  const stat = statSync(path);
+
+  if (!stat.isFile()) {
     errors.push(`${relative(repoRoot, path)} must be a file`);
     return;
   }
 
-  if (statSync(path).size === 0) {
+  if (stat.size === 0) {
     errors.push(`${relative(repoRoot, path)} must not be empty`);
   }
 }

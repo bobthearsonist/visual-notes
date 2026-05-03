@@ -10,7 +10,6 @@
     "lint": "pnpm -r lint",
     "layout:metrics": "npm --prefix plugins/obsidian-plugin run layout:metrics",
     "package:obsidian": "pnpm --filter @visual-notes/obsidian-plugin build && node scripts/package-obsidian-plugin.mjs",
-    "validate:obsidian-release": "pnpm package:obsidian",
     "typecheck": "pnpm -r typecheck"
   },
   "keywords": ["obsidian", "claude-code", "concept-map", "visual-notes"],
