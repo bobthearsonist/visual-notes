@@ -437,8 +437,18 @@ async function evaluateRenderPersistence() {
   ) {
     persistenceFailures.push("renderer node sizing should use readable compact paint-safe 13px nodes");
   }
-  if (!rendererSource.includes('"font-size": 9') || !rendererSource.includes('"arrow-scale": 0.8')) {
-    persistenceFailures.push("renderer edge labels and arrow scale should match the hook-style renderer");
+  if (
+    !rendererSource.includes('"font-size": 14') ||
+    !rendererSource.includes('"font-weight": 700') ||
+    !rendererSource.includes('"arrow-scale": 0.8')
+  ) {
+    persistenceFailures.push("renderer edge labels should be readable while keeping hook-style arrow scale");
+  }
+  if (!rendererSource.includes('"text-background-opacity": 0.95') || !rendererSource.includes('"text-background-padding": "5px"')) {
+    persistenceFailures.push("renderer edge labels should keep a readable background halo");
+  }
+  if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(rendererSource)) {
+    persistenceFailures.push("renderer weak edge labels must not be faded by edge opacity");
   }
   if (!mainSource.includes("applyDeterministicLayout({")) {
     persistenceFailures.push("extraction/write path must apply deterministic layout before persisting sidecars");
