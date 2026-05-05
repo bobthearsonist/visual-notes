@@ -24,8 +24,8 @@ const layoutModule = await import(`data:text/javascript;base64,${Buffer.from(sou
 const { applyDeterministicLayout, calculateLayoutMetrics } = layoutModule;
 
 const qualityGate = {
-  maxWidth: 1000,
-  maxHeight: 660,
+  maxWidth: 1120,
+  maxHeight: 520,
   minCardFitScale: 0.85,
   minNodeDistance: 100,
   maxClosePairs: 0,
@@ -34,9 +34,9 @@ const qualityGate = {
   maxPrimaryEdgeLength: 430,
   maxWeakEdgeLength: 780,
   maxWeakEdgeLengthBudget: 1800,
-  maxComponentWidth: 640,
-  maxComponentHeight: 460,
-  minEstimatedDefaultNodeFontPx: 14.5,
+  maxComponentWidth: 700,
+  maxComponentHeight: 520,
+  minEstimatedDefaultNodeFontPx: 12,
 };
 
 const fixtures = [
@@ -143,6 +143,58 @@ const fixtures = [
       ],
     },
   },
+  {
+    name: "Profisee hook renderer fixture",
+    expected: {
+      nodeCount: 12,
+      edgeCount: 11,
+      nodeIds: [
+        "ccusage",
+        "token-limit",
+        "init-ps1",
+        "no-turns",
+        "visual-notes",
+        "test-artifacts",
+        "py-script",
+        "skill-repo-fix",
+        "obsidian-testing",
+        "obsidian-cli",
+        "ai-private",
+        "daily-overview",
+      ],
+    },
+    sidecar: {
+      kind: "daily-overview",
+      title: "Daily Overview - 2026-04-16",
+      nodes: [
+        node("ccusage", "ccusage\nWrapper", "system context", 150, 150),
+        node("token-limit", "Update token\nlimit to 80M", "task completed", 350, 100),
+        node("init-ps1", "ai/init.ps1", "system context", 150, 300),
+        node("no-turns", "No turns\nmetric available", "task completed", 350, 250),
+        node("visual-notes", "Visual Notes\nCleanup", "task completed", 650, 100),
+        node("test-artifacts", "Remove test\nartifacts", "task completed", 550, 250),
+        node("py-script", "Remove\ngenerate-visual.py", "task completed", 750, 250),
+        node("skill-repo-fix", "Fix skill repo\nsplit (ai vs private)", "task completed", 650, 350),
+        node("obsidian-testing", "Obsidian UI\nTesting Research", "task completed", 900, 150),
+        node("obsidian-cli", "Obsidian CLI\neval + screenshot", "system context", 900, 300),
+        node("ai-private", "ai-private\nrepo", "system context", 500, 400),
+        node("daily-overview", "Daily Overview\n(this visual!)", "task active", 1100, 220),
+      ],
+      edges: [
+        edge("ccusage", "token-limit", "updated", "strong-edge"),
+        edge("ccusage", "init-ps1", "lives in", ""),
+        edge("ccusage", "no-turns", "investigated", ""),
+        edge("visual-notes", "test-artifacts", "cleaned up", "strong-edge"),
+        edge("visual-notes", "py-script", "removed", "strong-edge"),
+        edge("visual-notes", "skill-repo-fix", "required", ""),
+        edge("skill-repo-fix", "ai-private", "moved refs to", ""),
+        edge("obsidian-testing", "obsidian-cli", "discovered", "strong-edge"),
+        edge("visual-notes", "daily-overview", "testing now", ""),
+        edge("init-ps1", "ai-private", "same ecosystem", "weak-edge"),
+        edge("obsidian-testing", "daily-overview", "validates", "weak-edge"),
+      ],
+    },
+  },
 ];
 
 const args = process.argv.slice(2);
@@ -158,7 +210,7 @@ for (const sidecarPath of sidecarPaths) {
 
 const failures = [];
 for (const fixture of fixtures) {
-  failures.push(...evaluateFixture(fixture.name, fixture.sidecar));
+  failures.push(...evaluateFixture(fixture));
 }
 failures.push(...evaluateEmptyGraph());
 failures.push(...(await evaluateRenderPersistence()));
@@ -175,7 +227,8 @@ if (failures.length > 0) {
   }
 }
 
-function evaluateFixture(name, sidecar) {
+function evaluateFixture(fixture) {
+  const { name, sidecar, expected } = fixture;
   const before = calculateLayoutMetrics(sidecar);
   const afterSidecar = applyDeterministicLayout(sidecar);
   const after = calculateLayoutMetrics(afterSidecar);
@@ -279,8 +332,50 @@ function evaluateFixture(name, sidecar) {
       `${name}: expected max component height <= ${qualityGate.maxComponentHeight}px, got ${after.maxComponentHeight}px`,
     );
   }
+  if (expected) {
+    fixtureFailures.push(...evaluateSidecarContract(name, sidecar, expected));
+  }
 
   return fixtureFailures;
+}
+
+function evaluateSidecarContract(name, sidecar, expected) {
+  const contractFailures = [];
+  const nodeIds = sidecar.nodes.map((node) => node.data.id);
+  const nodeIdSet = new Set(nodeIds);
+
+  if (sidecar.nodes.length !== expected.nodeCount) {
+    contractFailures.push(`${name}: expected ${expected.nodeCount} nodes, got ${sidecar.nodes.length}`);
+  }
+  if (sidecar.edges.length !== expected.edgeCount) {
+    contractFailures.push(`${name}: expected ${expected.edgeCount} edges, got ${sidecar.edges.length}`);
+  }
+
+  const missingNodeIds = expected.nodeIds.filter((id) => !nodeIdSet.has(id));
+  if (missingNodeIds.length > 0) {
+    contractFailures.push(`${name}: missing node ids ${missingNodeIds.join(", ")}`);
+  }
+
+  const duplicateNodeIds = nodeIds.filter((id, index) => nodeIds.indexOf(id) !== index);
+  if (duplicateNodeIds.length > 0) {
+    contractFailures.push(`${name}: duplicate node ids ${[...new Set(duplicateNodeIds)].join(", ")}`);
+  }
+
+  const invalidEdges = sidecar.edges
+    .filter((edge) => !nodeIdSet.has(edge.data.source) || !nodeIdSet.has(edge.data.target))
+    .map((edge) => `${edge.data.source}->${edge.data.target}`);
+  if (invalidEdges.length > 0) {
+    contractFailures.push(`${name}: edges reference missing endpoints ${invalidEdges.join(", ")}`);
+  }
+
+  const unlabeledEdges = sidecar.edges
+    .filter((edge) => !edge.data.label?.trim())
+    .map((edge) => `${edge.data.source}->${edge.data.target}`);
+  if (unlabeledEdges.length > 0) {
+    contractFailures.push(`${name}: edges missing labels ${unlabeledEdges.join(", ")}`);
+  }
+
+  return contractFailures;
 }
 
 function evaluateEmptyGraph() {
@@ -310,11 +405,40 @@ async function evaluateRenderPersistence() {
   if (!rendererSource.includes("this.renderGraph(sidecar);")) {
     persistenceFailures.push("renderer must pass parsed sidecar positions directly into renderGraph");
   }
+  const nodeElementIndex = rendererSource.indexOf("...sidecar.nodes.map");
+  const edgeElementIndex = rendererSource.indexOf("...sidecar.edges.map");
+
   if (!rendererSource.includes('label: "data(displayLabel)"')) {
-    persistenceFailures.push("renderer must use derived display labels so weak/long edges do not clutter the card");
+    persistenceFailures.push("renderer must render visible node and edge labels");
   }
-  if (!rendererSource.includes('"font-size": 17')) {
-    persistenceFailures.push("renderer node font size should stay large enough for default-fit readability");
+  if (nodeElementIndex === -1 || edgeElementIndex === -1 || nodeElementIndex > edgeElementIndex) {
+    persistenceFailures.push("renderer must provide nodes before edges so relationship endpoints exist");
+  }
+  if (rendererSource.includes("story-card") || /data:\s*\{[^}]*parent:/s.test(rendererSource)) {
+    persistenceFailures.push("renderer must not synthesize compound story-card parents");
+  }
+  if (!rendererSource.includes('"curve-style": "bezier"')) {
+    persistenceFailures.push("renderer must use hook-style bezier edges for preset sidecar coordinates");
+  }
+  if (!rendererSource.includes("layout: { name: \"preset\", fit: false }")) {
+    persistenceFailures.push("renderer must use preset layout without recalculating sidecar positions");
+  }
+  if (!rendererSource.includes("new ResizeObserver") || !rendererSource.includes("this.cy.fit(undefined, 40)")) {
+    persistenceFailures.push("renderer must schedule a size-aware hook-style fit after Obsidian mounts the graph");
+  }
+  if (rendererSource.includes("displayLabel: edgeDisplayLabel") || /selector:\s*"edge\.weak-edge"[\s\S]*label:\s*""/.test(rendererSource)) {
+    persistenceFailures.push("renderer must keep all sidecar edge labels visible like the MVP hook renderer");
+  }
+  if (
+    !rendererSource.includes('"font-size": 13') ||
+    !rendererSource.includes('"font-weight": 600') ||
+    !rendererSource.includes("width: 118") ||
+    !rendererSource.includes("height: 54")
+  ) {
+    persistenceFailures.push("renderer node sizing should use readable compact paint-safe 13px nodes");
+  }
+  if (!rendererSource.includes('"font-size": 9') || !rendererSource.includes('"arrow-scale": 0.8')) {
+    persistenceFailures.push("renderer edge labels and arrow scale should match the hook-style renderer");
   }
   if (!mainSource.includes("applyDeterministicLayout({")) {
     persistenceFailures.push("extraction/write path must apply deterministic layout before persisting sidecars");

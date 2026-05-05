@@ -1,18 +1,22 @@
 import type { VisualNotesEdge, VisualNotesNode, VisualNotesSidecar } from "./schema";
 
-const CANVAS_START_X = 80;
-const CANVAS_START_Y = 90;
-const STORY_SLOT_X = 200;
-const STORY_SLOT_Y = 140;
-const COMPONENT_GAP_X = 190;
-const COMPONENT_GAP_Y = 110;
-const READABLE_CARD_WIDTH = 880;
-const READABLE_CARD_HEIGHT = 700;
-const FIT_PADDING_X = 80;
-const FIT_PADDING_Y = 90;
-const COLLISION_RADIUS_X = 170;
-const COLLISION_RADIUS_Y = 105;
-const NODE_FONT_SIZE = 17;
+const CANVAS_START_X = 110;
+const CANVAS_START_Y = 110;
+const COMPONENT_GAP_X = 220;
+const COMPONENT_GAP_Y = 160;
+const COMPONENT_ROW_WIDTH = 1100;
+const NODE_GAP_X = 170;
+const NODE_GAP_Y = 125;
+const FLAT_BOARD_MAX_NODES = 28;
+const FLAT_BOARD_TARGET_ROWS = 4;
+const FLAT_BOARD_MAX_COLUMNS = 6;
+const READABLE_CARD_WIDTH = 1120;
+const READABLE_CARD_HEIGHT = 520;
+const FIT_PADDING_X = 100;
+const FIT_PADDING_Y = 100;
+const COLLISION_RADIUS_X = 120;
+const COLLISION_RADIUS_Y = 95;
+const NODE_FONT_SIZE = 13;
 const VISIBLE_MIN_X = 20;
 const VISIBLE_MIN_Y = 40;
 const MAX_X = 5000;
@@ -45,17 +49,6 @@ interface ComponentLayout {
   positions: Map<string, Position>;
   width: number;
   height: number;
-}
-
-interface LaidOutComponent {
-  component: Component;
-  layout: ComponentLayout;
-}
-
-interface StorySlot extends Position {
-  column: number;
-  row: number;
-  order: number;
 }
 
 interface Bounds {
@@ -112,54 +105,22 @@ export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetri
   const weakEdges = sidecar.edges.filter((edge) => edge.classes === "weak-edge");
 
   if (positions.length === 0) {
-    return {
-      nodeCount: 0,
-      edgeCount: sidecar.edges.length,
-      componentCount: 0,
-      weakEdgeCount: weakEdges.length,
-      minX: 0,
-      maxX: 0,
-      minY: 0,
-      maxY: 0,
-      width: 0,
-      height: 0,
-      aspectRatio: 0,
-      averageDistanceFromCentroid: 0,
-      maxDistanceFromCentroid: 0,
-      maxOutlierRatio: 0,
-      minNodeDistance: 0,
-      closePairCount: 0,
-      edgeCrossingCount: 0,
-      averagePrimaryEdgeLength: 0,
-      maxPrimaryEdgeLength: 0,
-      maxWeakEdgeLength: 0,
-      weakEdgeLengthBudget: 0,
-      maxComponentWidth: 0,
-      maxComponentHeight: 0,
-      cardFitScale: 1,
-      estimatedDefaultNodeFontPx: NODE_FONT_SIZE,
-    };
+    return emptyMetrics(sidecar.edges.length, weakEdges.length);
   }
 
-  const minX = Math.min(...positions.map((position) => position.x));
-  const maxX = Math.max(...positions.map((position) => position.x));
-  const minY = Math.min(...positions.map((position) => position.y));
-  const maxY = Math.max(...positions.map((position) => position.y));
-  const width = maxX - minX;
-  const height = maxY - minY;
+  const bounds = boundsForPositions(positions);
   const centroid = calculateCentroid(positions);
   const distances = positions.map((position) => distance(position, centroid));
-  const averageDistanceFromCentroid =
-    distances.reduce((sum, current) => sum + current, 0) / Math.max(distances.length, 1);
+  const averageDistanceFromCentroid = average(distances);
   const infoById = buildInfoById(sidecar.nodes, sidecar.edges);
-  const components = findComponents(sidecar.nodes, primaryEdges, infoById);
+  const components = buildVisualComponents(sidecar.nodes, sidecar.edges, infoById);
   const proximity = calculateProximityStats(positions);
   const primaryEdgeLengths = calculateEdgeLengths(sidecar.nodes, primaryEdges);
   const weakEdgeLengths = calculateEdgeLengths(sidecar.nodes, weakEdges);
   const componentStats = calculateComponentStats(components);
   const cardFitScale = Math.min(
-    READABLE_CARD_WIDTH / Math.max(width + FIT_PADDING_X, 1),
-    READABLE_CARD_HEIGHT / Math.max(height + FIT_PADDING_Y, 1),
+    READABLE_CARD_WIDTH / Math.max(bounds.width + FIT_PADDING_X, 1),
+    READABLE_CARD_HEIGHT / Math.max(bounds.height + FIT_PADDING_Y, 1),
   );
 
   return {
@@ -167,13 +128,13 @@ export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetri
     edgeCount: sidecar.edges.length,
     componentCount: components.length,
     weakEdgeCount: weakEdges.length,
-    minX,
-    maxX,
-    minY,
-    maxY,
-    width,
-    height,
-    aspectRatio: height === 0 ? width : width / height,
+    minX: bounds.minX,
+    maxX: bounds.maxX,
+    minY: bounds.minY,
+    maxY: bounds.maxY,
+    width: bounds.width,
+    height: bounds.height,
+    aspectRatio: bounds.height === 0 ? bounds.width : bounds.width / bounds.height,
     averageDistanceFromCentroid,
     maxDistanceFromCentroid: Math.max(...distances),
     maxOutlierRatio: Math.max(...distances) / Math.max(averageDistanceFromCentroid, 1),
@@ -187,7 +148,37 @@ export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetri
     maxComponentWidth: componentStats.maxWidth,
     maxComponentHeight: componentStats.maxHeight,
     cardFitScale,
-    estimatedDefaultNodeFontPx: NODE_FONT_SIZE * cardFitScale,
+    estimatedDefaultNodeFontPx: NODE_FONT_SIZE * Math.min(cardFitScale, 1),
+  };
+}
+
+function emptyMetrics(edgeCount: number, weakEdgeCount: number): LayoutMetrics {
+  return {
+    nodeCount: 0,
+    edgeCount,
+    componentCount: 0,
+    weakEdgeCount,
+    minX: 0,
+    maxX: 0,
+    minY: 0,
+    maxY: 0,
+    width: 0,
+    height: 0,
+    aspectRatio: 0,
+    averageDistanceFromCentroid: 0,
+    maxDistanceFromCentroid: 0,
+    maxOutlierRatio: 0,
+    minNodeDistance: 0,
+    closePairCount: 0,
+    edgeCrossingCount: 0,
+    averagePrimaryEdgeLength: 0,
+    maxPrimaryEdgeLength: 0,
+    maxWeakEdgeLength: 0,
+    weakEdgeLengthBudget: 0,
+    maxComponentWidth: 0,
+    maxComponentHeight: 0,
+    cardFitScale: 1,
+    estimatedDefaultNodeFontPx: NODE_FONT_SIZE,
   };
 }
 
@@ -196,16 +187,19 @@ function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Visual
     return [];
   }
 
-  const primaryEdges = getPrimaryEdges(edges);
   const infoById = buildInfoById(nodes, edges);
-  const components = buildVisualComponents(nodes, primaryEdges, edges, infoById);
-  const packedPositions = packStoryClusters(
-    components.map((component) => ({
-      component,
-      layout: layoutStoryCluster(component, primaryEdges),
-    })),
-  );
-  pullWeakAttachmentsClose(packedPositions, components, edges);
+  if (nodes.length <= FLAT_BOARD_MAX_NODES) {
+    const components = buildVisualComponents(nodes, edges, infoById);
+    const orderedNodes = components.flatMap((component) => orderComponentNodes(component.nodes, edges));
+    const flatPositions = layoutFlatBoard(orderedNodes, edges);
+    return nodes.map((node) => ({
+      ...node,
+      position: flatPositions.get(node.data.id) ?? node.position,
+    }));
+  }
+
+  const components = buildVisualComponents(nodes, edges, infoById);
+  const packedPositions = packComponents(components.map((component) => layoutComponent(component, edges)));
 
   return nodes.map((node) => ({
     ...node,
@@ -213,8 +207,89 @@ function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Visual
   }));
 }
 
-function getPrimaryEdges(edges: VisualNotesEdge[]): VisualNotesEdge[] {
-  return edges.filter((edge) => edge.classes !== "weak-edge");
+function layoutFlatBoard(nodes: NodeInfo[], edges: VisualNotesEdge[]): Map<string, Position> {
+  const positions = new Map<string, Position>();
+  const columns = Math.min(
+    FLAT_BOARD_MAX_COLUMNS,
+    Math.max(1, Math.ceil(nodes.length / FLAT_BOARD_TARGET_ROWS)),
+  );
+  const slots = nodes.map((_, index): Position => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    return {
+      x: CANVAS_START_X + column * NODE_GAP_X,
+      y: CANVAS_START_Y + row * NODE_GAP_Y,
+    };
+  });
+  const orderedNodes = optimizeFlatBoardOrder(nodes, slots, edges);
+
+  orderedNodes.forEach((node, index) => {
+    positions.set(node.id, slots[index] ?? node.node.position);
+  });
+
+  return positions;
+}
+
+function optimizeFlatBoardOrder(
+  nodes: NodeInfo[],
+  slots: Position[],
+  edges: VisualNotesEdge[],
+): NodeInfo[] {
+  const seeds = [
+    nodes,
+    [...nodes].sort((left, right) => left.index - right.index),
+    [...nodes].sort((left, right) => scoreNode(right) - scoreNode(left) || left.index - right.index),
+  ];
+
+  return seeds
+    .map((seed) => improveFlatBoardOrder(seed, slots, edges))
+    .sort((left, right) => flatBoardCost(left, slots, edges) - flatBoardCost(right, slots, edges))[0];
+}
+
+function improveFlatBoardOrder(
+  seed: NodeInfo[],
+  slots: Position[],
+  edges: VisualNotesEdge[],
+): NodeInfo[] {
+  const order = [...seed];
+  let currentCost = flatBoardCost(order, slots, edges);
+  let improved = true;
+  let pass = 0;
+
+  while (improved && pass < 8) {
+    improved = false;
+    pass += 1;
+
+    for (let left = 0; left < order.length - 1; left += 1) {
+      for (let right = left + 1; right < order.length; right += 1) {
+        [order[left], order[right]] = [order[right], order[left]];
+        const nextCost = flatBoardCost(order, slots, edges);
+        if (nextCost < currentCost) {
+          currentCost = nextCost;
+          improved = true;
+        } else {
+          [order[left], order[right]] = [order[right], order[left]];
+        }
+      }
+    }
+  }
+
+  return order;
+}
+
+function flatBoardCost(order: NodeInfo[], slots: Position[], edges: VisualNotesEdge[]): number {
+  const positionById = new Map(order.map((node, index): [string, Position] => [node.id, slots[index]]));
+  const primaryEdges = getPrimaryEdges(edges);
+  const weakEdges = edges.filter((edge) => edge.classes === "weak-edge");
+  const crossingCost = countCrossingsForPositions(positionById, primaryEdges) * 10000;
+  const primaryLengthCost = edgeLengthCost(positionById, primaryEdges) * 5;
+  const weakLengthCost = edgeLengthCost(positionById, weakEdges);
+  const storyOrderCost = order.reduce(
+    (cost, node, index) => cost + Math.abs(node.index - index) * 0.5,
+    0,
+  );
+
+  return crossingCost + primaryLengthCost + weakLengthCost + storyOrderCost;
 }
 
 function buildInfoById(
@@ -226,15 +301,14 @@ function buildInfoById(
   return new Map(
     nodes.map((node, index): [string, NodeInfo] => {
       const classes = parseNodeClasses(node.classes);
-      const id = node.data.id;
       return [
-        id,
+        node.data.id,
         {
           node,
-          id,
+          id: node.data.id,
           type: classes.type,
           status: classes.status,
-          degree: degreeById.get(id) ?? 0,
+          degree: degreeById.get(node.data.id) ?? 0,
           index,
         },
       ];
@@ -242,189 +316,17 @@ function buildInfoById(
   );
 }
 
-function layoutStoryCluster(component: Component, edges: VisualNotesEdge[]): ComponentLayout {
-  const positions = new Map<string, Position>();
-
-  if (component.nodes.length === 0) {
-    return { positions, width: 0, height: 0 };
-  }
-
-  const columns = columnCountForComponent(component.nodes.length);
-  const rows = Math.ceil(component.nodes.length / columns);
-  const slots = createStorySlots(columns, rows);
-  const remainingSlots = [...slots];
-  const placedSlots = new Map<string, StorySlot>();
-  const componentIds = new Set(component.nodes.map((node) => node.id));
-  const localEdges = edges.filter(
-    (edge) => componentIds.has(edge.data.source) && componentIds.has(edge.data.target),
-  );
-
-  orderNodesForStory(component.nodes).forEach((node) => {
-    const slot = chooseStorySlot(node, remainingSlots, placedSlots, localEdges);
-    remainingSlots.splice(remainingSlots.indexOf(slot), 1);
-    placedSlots.set(node.id, slot);
-    positions.set(node.id, { x: slot.x, y: slot.y });
-  });
-
-  return {
-    positions,
-    width: Math.max(0, (columns - 1) * STORY_SLOT_X),
-    height: Math.max(0, (rows - 1) * STORY_SLOT_Y),
-  };
-}
-
-function columnCountForComponent(nodeCount: number): number {
-  if (nodeCount <= 1) {
-    return 1;
-  }
-
-  if (nodeCount <= 6) {
-    return 2;
-  }
-
-  return 3;
-}
-
-function createStorySlots(columns: number, rows: number): StorySlot[] {
-  const slots: StorySlot[] = [];
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      slots.push({
-        x: column * STORY_SLOT_X,
-        y: row * STORY_SLOT_Y,
-        column,
-        row,
-        order: row * columns + column,
-      });
-    }
-  }
-
-  return slots;
-}
-
-function chooseStorySlot(
-  node: NodeInfo,
-  slots: StorySlot[],
-  placedSlots: Map<string, StorySlot>,
-  edges: VisualNotesEdge[],
-): StorySlot {
-  const placedNeighborSlots = edges
-    .map((edge) => {
-      if (edge.data.source === node.id) {
-        return placedSlots.get(edge.data.target);
-      }
-
-      if (edge.data.target === node.id) {
-        return placedSlots.get(edge.data.source);
-      }
-
-      return undefined;
-    })
-    .filter((slot): slot is StorySlot => Boolean(slot));
-
-  if (placedNeighborSlots.length === 0) {
-    return [...slots].sort((left, right) => storyLaneCost(node, left) - storyLaneCost(node, right))[0];
-  }
-
-  return [...slots].sort((left, right) => {
-    const leftCost = storySlotCost(node, left, placedNeighborSlots);
-    const rightCost = storySlotCost(node, right, placedNeighborSlots);
-    return leftCost - rightCost || left.order - right.order;
-  })[0];
-}
-
-function storySlotCost(node: NodeInfo, slot: StorySlot, neighborSlots: StorySlot[]): number {
-  return (
-    neighborSlots.reduce((sum, neighborSlot) => {
-      const alignmentPenalty =
-        slot.column !== neighborSlot.column && slot.row !== neighborSlot.row ? 85 : 0;
-      return sum + distance(slot, neighborSlot) + alignmentPenalty;
-    }, 0) +
-    storyLaneCost(node, slot) +
-    slot.order * 10
-  );
-}
-
-function storyLaneCost(node: NodeInfo, slot: StorySlot): number {
-  const preferredColumn = preferredColumnForNode(node, slot);
-  const statusRowPenalty = statusRowPreference(node.status) * slot.row * 8;
-  return Math.abs(slot.column - preferredColumn) * 160 + statusRowPenalty;
-}
-
-function preferredColumnForNode(node: NodeInfo, slot: StorySlot): number {
-  const lastColumn = Math.max(slot.column, 1);
-  switch (node.type) {
-    case "system":
-      return 0;
-    case "decision":
-      return Math.min(2, lastColumn);
-    case "task":
-      return Math.min(1, lastColumn);
-  }
-}
-
-function statusRowPreference(status: NodeStatus): number {
-  switch (status) {
-    case "active":
-      return 0;
-    case "context":
-      return 1;
-    case "blocked":
-      return 2;
-    case "completed":
-      return 3;
-  }
-}
-
-function packStoryClusters(layouts: LaidOutComponent[]): Map<string, Position> {
-  const packedPositions = new Map<string, Position>();
-  let rowX = CANVAS_START_X;
-  let rowY = CANVAS_START_Y;
-  let rowHeight = 0;
-
-  layouts.forEach(({ layout }) => {
-    const advanceWidth = Math.max(layout.width, STORY_SLOT_X);
-    const wouldExceedRow =
-      rowX > CANVAS_START_X && rowX + advanceWidth - CANVAS_START_X > READABLE_CARD_WIDTH;
-
-    if (wouldExceedRow) {
-      rowX = CANVAS_START_X;
-      rowY += rowHeight + COMPONENT_GAP_Y;
-      rowHeight = 0;
-    }
-
-    for (const [id, position] of layout.positions.entries()) {
-      packedPositions.set(
-        id,
-        clampPosition({
-          x: rowX + position.x,
-          y: rowY + position.y,
-        }),
-      );
-    }
-
-    rowX += advanceWidth + COMPONENT_GAP_X;
-    rowHeight = Math.max(rowHeight, layout.height);
-  });
-
-  return packedPositions;
-}
-
 function buildVisualComponents(
   nodes: VisualNotesNode[],
-  primaryEdges: VisualNotesEdge[],
   edges: VisualNotesEdge[],
   infoById: Map<string, NodeInfo>,
 ): Component[] {
-  const components = findComponents(nodes, primaryEdges, infoById);
-  const storyComponents = components.filter((component) => component.nodes.length > 1);
-  const singletonNodes = components
-    .filter((component) => component.nodes.length === 1)
-    .flatMap((component) => component.nodes);
+  const primaryComponents = findComponents(nodes, getPrimaryEdges(edges), infoById);
+  const storyComponents = primaryComponents.filter((component) => component.nodes.length > 1);
+  const singletonComponents = primaryComponents.filter((component) => component.nodes.length === 1);
 
-  if (singletonNodes.length === 0 || storyComponents.length === 0) {
-    return components;
+  if (storyComponents.length === 0) {
+    return primaryComponents;
   }
 
   const storyByAnchorId = new Map(
@@ -435,21 +337,29 @@ function buildVisualComponents(
     component.nodes.forEach((node) => componentByNodeId.set(node.id, component));
   });
 
-  singletonNodes.forEach((node) => {
-    const target = findSingletonStoryTarget(node, storyComponents, componentByNodeId, edges);
-    storyByAnchorId.get(target.anchorId)?.push(node);
+  singletonComponents.forEach((component) => {
+    const singleton = component.nodes[0];
+    if (!singleton) {
+      return;
+    }
+
+    const target = findSingletonStoryTarget(singleton, storyComponents, componentByNodeId, edges);
+    storyByAnchorId.get(target.anchorId)?.push(singleton);
   });
 
-  return Array.from(storyByAnchorId.entries()).map(([anchorId, storyNodes]) => ({
-    nodes: sortNodes(storyNodes),
-    score: componentScore(storyNodes),
-    anchorId,
-  })).sort(
-    (a, b) =>
-      b.nodes.length - a.nodes.length ||
-      b.score - a.score ||
-      a.anchorId.localeCompare(b.anchorId),
-  );
+  return Array.from(storyByAnchorId.entries())
+    .map(([anchorId, componentNodes]) => ({
+      nodes: sortNodes(componentNodes),
+      score: componentScore(componentNodes),
+      anchorId,
+    }))
+    .sort(
+      (a, b) =>
+        minNodeIndex(a) - minNodeIndex(b) ||
+        b.nodes.length - a.nodes.length ||
+        b.score - a.score ||
+        a.anchorId.localeCompare(b.anchorId),
+    );
 }
 
 function findSingletonStoryTarget(
@@ -477,7 +387,7 @@ function findSingletonStoryTarget(
 
   return (
     [...storyComponents]
-      .filter((component) => Math.min(...component.nodes.map((storyNode) => storyNode.index)) <= node.index)
+      .filter((component) => minNodeIndex(component) <= node.index)
       .sort(
         (a, b) =>
           Math.abs(node.index - maxNodeIndex(a)) - Math.abs(node.index - maxNodeIndex(b)) ||
@@ -486,170 +396,118 @@ function findSingletonStoryTarget(
   );
 }
 
-function maxNodeIndex(component: Component): number {
-  return Math.max(...component.nodes.map((node) => node.index));
-}
+function layoutComponent(component: Component, edges: VisualNotesEdge[]): ComponentLayout {
+  const positions = new Map<string, Position>();
+  const orderedNodes = orderComponentNodes(component.nodes, edges);
+  const columns = columnCountForComponent(orderedNodes.length);
 
-function pullWeakAttachmentsClose(
-  positionById: Map<string, Position>,
-  components: Component[],
-  edges: VisualNotesEdge[],
-): void {
-  const componentIndexById = new Map<string, number>();
-  components.forEach((component, componentIndex) => {
-    component.nodes.forEach((node) => componentIndexById.set(node.id, componentIndex));
-  });
-
-  components.forEach((component, componentIndex) => {
-    if (component.nodes.length > 1) {
-      return;
-    }
-
-    const targetComponent = findWeakAttachmentTarget(component, componentIndex, components, edges, componentIndexById);
-    if (!targetComponent) {
-      return;
-    }
-
-    const componentPositions = component.nodes
-      .map((node) => positionById.get(node.id))
-      .filter((position): position is Position => Boolean(position));
-    const targetPositions = targetComponent.nodes
-      .map((node) => positionById.get(node.id))
-      .filter((position): position is Position => Boolean(position));
-
-    if (componentPositions.length === 0 || targetPositions.length === 0) {
-      return;
-    }
-
-    const relativePositions = relativeToTopLeft(componentPositions);
-    const componentBounds = boundsForPositions(componentPositions);
-    const targetBounds = boundsForPositions(targetPositions);
-    const occupied = Array.from(positionById.entries()).filter(
-      ([id]) => component.nodes.every((node) => node.id !== id),
-    );
-    const candidate = attachmentCandidates(targetBounds, componentBounds).find((candidatePosition) =>
-      canPlaceAt(candidatePosition, relativePositions, occupied),
-    );
-
-    if (!candidate) {
-      return;
-    }
-
-    component.nodes.forEach((node, nodeIndex) => {
-      const relativePosition = relativePositions[nodeIndex];
-      positionById.set(
-        node.id,
-        clampPosition({
-          x: candidate.x + relativePosition.x,
-          y: candidate.y + relativePosition.y,
-        }),
-      );
+  orderedNodes.forEach((node, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    positions.set(node.id, {
+      x: column * NODE_GAP_X,
+      y: row * NODE_GAP_Y,
     });
   });
+
+  const normalized = normalizePositions(positions);
+  const bounds = boundsForPositions(Array.from(normalized.values()));
+
+  return {
+    positions: normalized,
+    width: bounds.width,
+    height: bounds.height,
+  };
 }
 
-function findWeakAttachmentTarget(
-  component: Component,
-  componentIndex: number,
-  components: Component[],
-  edges: VisualNotesEdge[],
-  componentIndexById: Map<string, number>,
-): Component | null {
-  const componentIds = new Set(component.nodes.map((node) => node.id));
-  const targetIndexes = edges
-    .filter((edge) => edge.classes === "weak-edge")
-    .map((edge) => {
-      if (componentIds.has(edge.data.source)) {
-        return componentIndexById.get(edge.data.target);
-      }
+function orderComponentNodes(nodes: NodeInfo[], edges: VisualNotesEdge[]): NodeInfo[] {
+  const anchor = selectAnchor(nodes);
+  const remaining = new Map(nodes.filter((node) => node.id !== anchor.id).map((node) => [node.id, node]));
+  const ordered = [anchor];
 
-      if (componentIds.has(edge.data.target)) {
-        return componentIndexById.get(edge.data.source);
-      }
-
-      return undefined;
-    })
-    .filter(
-      (targetIndex): targetIndex is number =>
-        targetIndex !== undefined && targetIndex !== componentIndex,
-    );
-
-  if (targetIndexes.length === 0) {
-    return null;
+  while (remaining.size > 0) {
+    const next = Array.from(remaining.values()).sort((left, right) => {
+      const leftConnected = isConnectedToAny(left, ordered, edges) ? 0 : 1;
+      const rightConnected = isConnectedToAny(right, ordered, edges) ? 0 : 1;
+      return leftConnected - rightConnected || scoreNode(right) - scoreNode(left) || left.index - right.index;
+    })[0];
+    ordered.push(next);
+    remaining.delete(next.id);
   }
 
-  return [...new Set(targetIndexes)]
-    .map((targetIndex) => components[targetIndex])
-    .sort((a, b) => b.nodes.length - a.nodes.length || b.score - a.score)[0];
+  return ordered;
 }
 
-function attachmentCandidates(targetBounds: Bounds, componentBounds: Bounds): Position[] {
-  const width = Math.max(componentBounds.width, STORY_SLOT_X);
-  const height = Math.max(componentBounds.height, STORY_SLOT_Y);
-  const belowY = targetBounds.maxY + COMPONENT_GAP_Y;
-  const rightX = targetBounds.maxX + COMPONENT_GAP_X;
-  const leftX = targetBounds.minX - COMPONENT_GAP_X - width;
-  const aboveY = targetBounds.minY - COMPONENT_GAP_Y - height;
-
-  return [
-    { x: rightX, y: targetBounds.minY },
-    { x: leftX, y: targetBounds.minY },
-    { x: targetBounds.minX, y: aboveY },
-    { x: rightX, y: targetBounds.maxY },
-    { x: targetBounds.minX, y: belowY },
-    { x: targetBounds.maxX - width, y: belowY },
-  ].filter(
-    (position) =>
-      position.x >= CANVAS_START_X &&
-      position.y >= CANVAS_START_Y &&
-      position.x + width <= CANVAS_START_X + READABLE_CARD_WIDTH &&
-      position.y + height <= CANVAS_START_Y + READABLE_CARD_HEIGHT,
+function isConnectedToAny(node: NodeInfo, placedNodes: NodeInfo[], edges: VisualNotesEdge[]): boolean {
+  const placedIds = new Set(placedNodes.map((placedNode) => placedNode.id));
+  return edges.some(
+    (edge) =>
+      (edge.data.source === node.id && placedIds.has(edge.data.target)) ||
+      (edge.data.target === node.id && placedIds.has(edge.data.source)),
   );
 }
 
-function canPlaceAt(
-  topLeft: Position,
-  relativePositions: Position[],
-  occupied: Array<[string, Position]>,
-): boolean {
-  return relativePositions.every((relativePosition) => {
-    const candidate = {
-      x: topLeft.x + relativePosition.x,
-      y: topLeft.y + relativePosition.y,
-    };
+function columnCountForComponent(nodeCount: number): number {
+  if (nodeCount <= 2) {
+    return nodeCount;
+  }
+  if (nodeCount <= 6) {
+    return 3;
+  }
+  return 4;
+}
 
-    return occupied.every(([, occupiedPosition]) => {
-      return (
-        Math.abs(candidate.x - occupiedPosition.x) >= COLLISION_RADIUS_X ||
-        Math.abs(candidate.y - occupiedPosition.y) >= COLLISION_RADIUS_Y
-      );
+function selectAnchor(nodes: NodeInfo[]): NodeInfo {
+  const systems = nodes.filter((node) => node.type === "system");
+  return sortNodes(systems.length > 0 ? systems : nodes)[0];
+}
+
+function normalizePositions(positions: Map<string, Position>): Map<string, Position> {
+  const bounds = boundsForPositions(Array.from(positions.values()));
+  const normalized = new Map<string, Position>();
+
+  positions.forEach((position, id) => {
+    normalized.set(id, {
+      x: Math.round(position.x - bounds.minX),
+      y: Math.round(position.y - bounds.minY),
     });
   });
+
+  return normalized;
 }
 
-function relativeToTopLeft(positions: Position[]): Position[] {
-  const bounds = boundsForPositions(positions);
+function packComponents(layouts: ComponentLayout[]): Map<string, Position> {
+  const packed = new Map<string, Position>();
+  let x = CANVAS_START_X;
+  let y = CANVAS_START_Y;
+  let rowHeight = 0;
 
-  return positions.map((position) => ({
-    x: position.x - bounds.minX,
-    y: position.y - bounds.minY,
-  }));
+  layouts.forEach((layout) => {
+    if (x > CANVAS_START_X && x + layout.width - CANVAS_START_X > COMPONENT_ROW_WIDTH) {
+      x = CANVAS_START_X;
+      y += rowHeight + COMPONENT_GAP_Y;
+      rowHeight = 0;
+    }
+
+    layout.positions.forEach((position, id) => {
+      packed.set(
+        id,
+        clampPosition({
+          x: x + position.x,
+          y: y + position.y,
+        }),
+      );
+    });
+
+    x += Math.max(layout.width, NODE_GAP_X) + COMPONENT_GAP_X;
+    rowHeight = Math.max(rowHeight, layout.height);
+  });
+
+  return packed;
 }
 
-function boundsForPositions(positions: Position[]): Bounds {
-  const minX = Math.min(...positions.map((position) => position.x));
-  const maxX = Math.max(...positions.map((position) => position.x));
-  const minY = Math.min(...positions.map((position) => position.y));
-  const maxY = Math.max(...positions.map((position) => position.y));
-
-  return {
-    minX,
-    maxX,
-    minY,
-    maxY,
-    width: maxX - minX,
-    height: maxY - minY,
-  };
+function getPrimaryEdges(edges: VisualNotesEdge[]): VisualNotesEdge[] {
+  return edges.filter((edge) => edge.classes !== "weak-edge");
 }
 
 function calculateDegree(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): Map<string, number> {
@@ -679,12 +537,9 @@ function findComponents(
   const idSet = new Set(ids);
 
   edges.forEach((edge) => {
-    const { source, target } = edge.data;
-    if (!idSet.has(source) || !idSet.has(target)) {
-      return;
+    if (idSet.has(edge.data.source) && idSet.has(edge.data.target)) {
+      union(parentById, edge.data.source, edge.data.target);
     }
-
-    union(parentById, source, target);
   });
 
   const nodesByRoot = new Map<string, NodeInfo[]>();
@@ -711,6 +566,7 @@ function findComponents(
     })
     .sort(
       (a, b) =>
+        minNodeIndex(a) - minNodeIndex(b) ||
         b.nodes.length - a.nodes.length ||
         b.score - a.score ||
         a.anchorId.localeCompare(b.anchorId),
@@ -718,20 +574,7 @@ function findComponents(
 }
 
 function sortNodes(nodes: NodeInfo[]): NodeInfo[] {
-  return [...nodes].sort((a, b) => scoreNode(b) - scoreNode(a) || a.id.localeCompare(b.id));
-}
-
-function orderNodesForStory(nodes: NodeInfo[]): NodeInfo[] {
-  const anchor = selectStoryAnchor(nodes);
-  return [anchor, ...sortNodes(nodes.filter((node) => node.id !== anchor.id))];
-}
-
-function selectStoryAnchor(nodes: NodeInfo[]): NodeInfo {
-  return (
-    [...nodes]
-      .filter((node) => node.type === "system")
-      .sort((a, b) => a.index - b.index)[0] ?? sortNodes(nodes)[0]
-  );
+  return [...nodes].sort((a, b) => scoreNode(b) - scoreNode(a) || a.index - b.index);
 }
 
 function componentScore(nodes: NodeInfo[]): number {
@@ -739,12 +582,7 @@ function componentScore(nodes: NodeInfo[]): number {
 }
 
 function scoreNode(node: NodeInfo): number {
-  return (
-    node.degree * 10 +
-    typeWeight(node.type) +
-    statusWeight(node.status) -
-    Math.min(node.index, 100) / 1000
-  );
+  return node.degree * 10 + typeWeight(node.type) + statusWeight(node.status) - node.index / 1000;
 }
 
 function typeWeight(type: NodeType): number {
@@ -769,6 +607,14 @@ function statusWeight(status: NodeStatus): number {
     case "completed":
       return 1;
   }
+}
+
+function minNodeIndex(component: Component): number {
+  return Math.min(...component.nodes.map((node) => node.index));
+}
+
+function maxNodeIndex(component: Component): number {
+  return Math.max(...component.nodes.map((node) => node.index));
 }
 
 function calculateCentroid(positions: Position[]): Position {
@@ -825,14 +671,10 @@ function calculateComponentStats(components: Component[]): { maxWidth: number; m
         return stats;
       }
 
-      const minX = Math.min(...positions.map((position) => position.x));
-      const maxX = Math.max(...positions.map((position) => position.x));
-      const minY = Math.min(...positions.map((position) => position.y));
-      const maxY = Math.max(...positions.map((position) => position.y));
-
+      const bounds = boundsForPositions(positions);
       return {
-        maxWidth: Math.max(stats.maxWidth, maxX - minX),
-        maxHeight: Math.max(stats.maxHeight, maxY - minY),
+        maxWidth: Math.max(stats.maxWidth, bounds.width),
+        maxHeight: Math.max(stats.maxHeight, bounds.height),
       };
     },
     { maxWidth: 0, maxHeight: 0 },
@@ -841,12 +683,18 @@ function calculateComponentStats(components: Component[]): { maxWidth: number; m
 
 function countEdgeCrossings(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): number {
   const positionById = new Map(nodes.map((node): [string, Position] => [node.data.id, node.position]));
+  return countCrossingsForPositions(positionById, edges);
+}
+
+function countCrossingsForPositions(
+  positionById: Map<string, Position>,
+  edges: VisualNotesEdge[],
+): number {
   let crossings = 0;
 
   edges.forEach((leftEdge, leftIndex) => {
     const leftSource = positionById.get(leftEdge.data.source);
     const leftTarget = positionById.get(leftEdge.data.target);
-
     if (!leftSource || !leftTarget) {
       return;
     }
@@ -858,7 +706,6 @@ function countEdgeCrossings(nodes: VisualNotesNode[], edges: VisualNotesEdge[]):
 
       const rightSource = positionById.get(rightEdge.data.source);
       const rightTarget = positionById.get(rightEdge.data.target);
-
       if (rightSource && rightTarget && segmentsCross(leftSource, leftTarget, rightSource, rightTarget)) {
         crossings += 1;
       }
@@ -866,6 +713,14 @@ function countEdgeCrossings(nodes: VisualNotesNode[], edges: VisualNotesEdge[]):
   });
 
   return crossings;
+}
+
+function edgeLengthCost(positionById: Map<string, Position>, edges: VisualNotesEdge[]): number {
+  return edges.reduce((sum, edge) => {
+    const source = positionById.get(edge.data.source);
+    const target = positionById.get(edge.data.target);
+    return source && target ? sum + distance(source, target) : sum;
+  }, 0);
 }
 
 function edgesShareEndpoint(left: VisualNotesEdge, right: VisualNotesEdge): boolean {
@@ -930,6 +785,22 @@ function union(parentById: Map<string, string>, left: string, right: string): vo
   if (leftRoot !== rightRoot) {
     parentById.set(rightRoot, leftRoot);
   }
+}
+
+function boundsForPositions(positions: Position[]): Bounds {
+  const minX = Math.min(...positions.map((position) => position.x));
+  const maxX = Math.max(...positions.map((position) => position.x));
+  const minY = Math.min(...positions.map((position) => position.y));
+  const maxY = Math.max(...positions.map((position) => position.y));
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
 }
 
 function distance(left: Position, right: Position): number {
