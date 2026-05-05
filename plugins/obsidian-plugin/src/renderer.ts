@@ -1,7 +1,7 @@
 import cytoscape from "cytoscape";
 import { EventRef, MarkdownRenderChild, normalizePath } from "obsidian";
 import type VisualNotesPlugin from "./main";
-import { parseSidecar, type VisualNotesEdge, type VisualNotesNode, type VisualNotesSidecar } from "./schema";
+import { parseSidecar, type VisualNotesSidecar } from "./schema";
 
 export function sidecarPathForMarkdownPath(path: string): string {
   return normalizePath(path.replace(/\.md$/i, "") + "-overview.json");
@@ -9,6 +9,8 @@ export function sidecarPathForMarkdownPath(path: string): string {
 
 export class VisualNotesRenderChild extends MarkdownRenderChild {
   private cy: cytoscape.Core | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private refitScheduled = false;
   private sidecarEventRef: EventRef | null = null;
   private readonly sidecarPath: string;
   private readonly sourcePath: string;
@@ -62,15 +64,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     try {
       const raw = await this.plugin.app.vault.adapter.read(this.sidecarPath);
       const sidecar = parseSidecar(JSON.parse(raw));
-
-      if (sidecar.kind && sidecar.kind !== "daily-overview") {
-        this.plugin.log("warn", `Unsupported sidecar kind '${sidecar.kind}'.`, {
-          sidecarPath: this.sidecarPath,
-        });
-        this.showPlaceholder(`Visual Notes: unsupported sidecar kind '${sidecar.kind}'.`);
-        return;
-      }
-
       this.renderGraph(sidecar);
     } catch (error) {
       this.plugin.log("error", "Failed to render sidecar.", { sidecarPath: this.sidecarPath, error });
@@ -97,27 +90,12 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.renderLegend(header);
 
     const graphEl = this.containerEl.createDiv({ cls: "visual-notes-graph" });
-    const positionById = new Map(sidecar.nodes.map((node) => [node.data.id, node.position]));
-    const storyGroups = buildStoryGroups(sidecar.nodes, sidecar.edges);
-    const storyGroupByNodeId = new Map(
-      storyGroups.flatMap((group) => group.nodeIds.map((nodeId): [string, string] => [nodeId, group.id])),
-    );
     const elements: cytoscape.ElementDefinition[] = [
-      ...storyGroups.map((group) => ({
-        group: "nodes" as const,
-        data: {
-          id: group.id,
-          label: group.label,
-          displayLabel: group.label,
-        },
-        classes: "story-card",
-      })),
       ...sidecar.nodes.map((node) => ({
         group: "nodes" as const,
         data: {
           ...node.data,
           displayLabel: node.data.label,
-          parent: storyGroupByNodeId.get(node.data.id),
         },
         classes: node.classes ?? "",
         position: node.position,
@@ -126,7 +104,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
         group: "edges" as const,
         data: {
           ...edge.data,
-          displayLabel: edgeDisplayLabel(edge, positionById),
+          displayLabel: edge.data.label,
         },
         classes: edge.classes ?? "",
       })),
@@ -135,11 +113,13 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.cy = cytoscape({
       container: graphEl,
       elements,
-      layout: { name: "preset", fit: true, padding: 26 },
+      layout: { name: "preset", fit: false },
       style: this.createStyle(),
-      minZoom: 0.3,
+      minZoom: 0.1,
       maxZoom: 3,
     });
+    this.observeGraphSize(graphEl);
+    this.scheduleRefitGraph();
 
     if (sidecar._usage) {
       this.containerEl.createDiv({
@@ -195,6 +175,41 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     }
 
     this.cy.style().fromJson(this.createStyle()).update();
+    this.scheduleRefitGraph();
+  }
+
+  private observeGraphSize(graphEl: HTMLElement): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = new ResizeObserver(() => this.scheduleRefitGraph());
+    this.resizeObserver.observe(graphEl);
+  }
+
+  private scheduleRefitGraph(): void {
+    if (this.refitScheduled) {
+      return;
+    }
+
+    this.refitScheduled = true;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        this.refitScheduled = false;
+        this.refitGraph();
+      });
+    });
+  }
+
+  private refitGraph(): void {
+    if (!this.cy) {
+      return;
+    }
+
+    const container = this.cy.container();
+    if (!container || container.clientWidth <= 0 || container.clientHeight <= 0) {
+      return;
+    }
+
+    this.cy.resize();
+    this.cy.fit(undefined, 40);
   }
 
   private createStyle(): cytoscape.StylesheetJson {
@@ -234,16 +249,18 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
           color: theme.nodeText,
           label: "data(displayLabel)",
           "font-family": "sans-serif",
-          "font-size": 17,
+          "font-size": 13,
           "font-weight": 600,
           "text-valign": "center",
           "text-halign": "center",
           "text-wrap": "wrap",
-          "text-max-width": "158px",
-          height: 84,
-          width: 172,
+          "text-max-width": "100px",
+          height: 54,
+          width: 118,
           padding: "12px",
           shape: "round-rectangle",
+          "z-index": 10,
+          "z-index-compare": "manual",
         },
       },
       {
@@ -264,29 +281,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       },
       { selector: "node.system", style: { shape: "round-rectangle" } },
       { selector: "node.task", style: { shape: "ellipse" } },
-      { selector: "node.decision", style: { shape: "diamond", width: 112, height: 112 } },
-      {
-        selector: "node.story-card",
-        style: {
-          shape: "round-rectangle",
-          "background-color": getCssVariable(computed, "--background-secondary", "#313244"),
-          "background-opacity": 0.32,
-          "border-color": theme.border,
-          "border-width": 1,
-          "border-style": "dashed",
-          color: theme.muted,
-          label: "",
-          "font-family": "sans-serif",
-          "font-size": 13,
-          "font-weight": 700,
-          "text-halign": "left",
-          "text-valign": "top",
-          "text-margin-x": 12,
-          "text-margin-y": 8,
-          padding: "28px",
-          "z-compound-depth": "bottom",
-        },
-      },
+      { selector: "node.decision", style: { shape: "diamond", padding: "16px" } },
       {
         selector: "edge",
         style: {
@@ -294,17 +289,18 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
           "line-color": theme.edge,
           "target-arrow-color": theme.edge,
           "target-arrow-shape": "triangle",
-          "curve-style": "taxi",
-          "taxi-direction": "auto",
-          "taxi-turn": "50%",
+          "arrow-scale": 0.8,
+          "curve-style": "bezier",
           color: theme.muted,
           label: "data(displayLabel)",
-          "font-size": 13,
+          "font-size": 9,
           "font-family": "sans-serif",
           "text-background-color": theme.background,
-          "text-background-opacity": 0.85,
+          "text-background-opacity": 0,
           "text-background-padding": "3px",
           "text-rotation": "none",
+          "z-index": 1,
+          "z-index-compare": "manual",
         },
       },
       {
@@ -320,7 +316,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
         style: {
           width: 1,
           opacity: 0.34,
-          label: "",
           "line-style": "dashed",
           "line-color": theme.weak,
           "target-arrow-color": theme.weak,
@@ -353,6 +348,9 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   private destroyGraph(): void {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    this.refitScheduled = false;
     this.cy?.destroy();
     this.cy = null;
   }
@@ -372,117 +370,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
 
 function getCssVariable(computed: CSSStyleDeclaration, name: string, fallback: string): string {
   return computed.getPropertyValue(name).trim() || fallback;
-}
-
-function edgeDisplayLabel(
-  edge: VisualNotesSidecar["edges"][number],
-  positionById: Map<string, { x: number; y: number }>,
-): string {
-  if (edge.classes === "weak-edge") {
-    return "";
-  }
-
-  const source = positionById.get(edge.data.source);
-  const target = positionById.get(edge.data.target);
-  if (!source || !target) {
-    return edge.data.label;
-  }
-
-  const edgeLength = Math.hypot(source.x - target.x, source.y - target.y);
-  return edgeLength <= 380 ? edge.data.label : "";
-}
-
-function buildStoryGroups(
-  nodes: VisualNotesNode[],
-  edges: VisualNotesEdge[],
-): Array<{ id: string; label: string; nodeIds: string[] }> {
-  const primaryEdges = edges.filter((edge) => edge.classes !== "weak-edge");
-  const ids = nodes.map((node) => node.data.id);
-  const idSet = new Set(ids);
-  const parentById = new Map(ids.map((id): [string, string] => [id, id]));
-
-  primaryEdges.forEach((edge) => {
-    if (idSet.has(edge.data.source) && idSet.has(edge.data.target)) {
-      union(parentById, edge.data.source, edge.data.target);
-    }
-  });
-
-  const nodesByRoot = new Map<string, VisualNotesNode[]>();
-  nodes.forEach((node) => {
-    const root = find(parentById, node.data.id);
-    const groupNodes = nodesByRoot.get(root) ?? [];
-    groupNodes.push(node);
-    nodesByRoot.set(root, groupNodes);
-  });
-
-  const groupedNodes = Array.from(nodesByRoot.values());
-  const storyGroups = groupedNodes.filter((groupNodes) => groupNodes.length > 1);
-  const singletonStory = groupedNodes.flatMap((groupNodes) =>
-    groupNodes.length === 1 ? groupNodes : [],
-  );
-
-  return [...storyGroups, singletonStory]
-    .filter((groupNodes) => groupNodes.length > 0)
-    .sort((left, right) => {
-      const leftPosition = groupTopLeft(left);
-      const rightPosition = groupTopLeft(right);
-      return leftPosition.y - rightPosition.y || leftPosition.x - rightPosition.x;
-    })
-    .map((groupNodes, index) => {
-      const anchor = selectStoryGroupAnchor(groupNodes);
-      return {
-        id: `story-card-${index + 1}`,
-        label: isSingletonStory(groupNodes, primaryEdges)
-          ? `Story ${index + 1}: Cross-cutting insights`
-          : `Story ${index + 1}: ${firstLabelLine(anchor.data.label)}`,
-        nodeIds: groupNodes.map((node) => node.data.id),
-      };
-    });
-}
-
-function isSingletonStory(nodes: VisualNotesNode[], primaryEdges: VisualNotesSidecar["edges"]): boolean {
-  const ids = new Set(nodes.map((node) => node.data.id));
-  return primaryEdges.every((edge) => !ids.has(edge.data.source) || !ids.has(edge.data.target));
-}
-
-function selectStoryGroupAnchor(nodes: VisualNotesNode[]): VisualNotesNode {
-  return (
-    [...nodes]
-      .filter((node) => node.classes.startsWith("system "))
-      .sort((left, right) => left.position.y - right.position.y || left.position.x - right.position.x)[0] ??
-    [...nodes].sort((left, right) => left.position.y - right.position.y || left.position.x - right.position.x)[0]
-  );
-}
-
-function groupTopLeft(nodes: VisualNotesNode[]): { x: number; y: number } {
-  return {
-    x: Math.min(...nodes.map((node) => node.position.x)),
-    y: Math.min(...nodes.map((node) => node.position.y)),
-  };
-}
-
-function firstLabelLine(label: string): string {
-  return label.split("\n")[0].replace(/\s+/g, " ").slice(0, 34);
-}
-
-function find(parentById: Map<string, string>, id: string): string {
-  const parent = parentById.get(id);
-  if (!parent || parent === id) {
-    return id;
-  }
-
-  const root = find(parentById, parent);
-  parentById.set(id, root);
-  return root;
-}
-
-function union(parentById: Map<string, string>, left: string, right: string): void {
-  const leftRoot = find(parentById, left);
-  const rightRoot = find(parentById, right);
-
-  if (leftRoot !== rightRoot) {
-    parentById.set(rightRoot, leftRoot);
-  }
 }
 
 function formatTokens(value: number): string {
