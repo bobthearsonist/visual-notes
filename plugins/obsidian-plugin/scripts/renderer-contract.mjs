@@ -124,11 +124,18 @@ function evaluateRendererSourceContract(source) {
   ) {
     contractFailures.push("renderer must keep readable compact paint-safe 13px nodes");
   }
-  if (!source.includes('"font-size": 9') || !source.includes('"arrow-scale": 0.8')) {
-    contractFailures.push("renderer must keep MVP 9px edge labels and arrow scale");
+  if (
+    !source.includes('"font-size": 14') ||
+    !source.includes('"font-weight": 700') ||
+    !source.includes('"arrow-scale": 0.8')
+  ) {
+    contractFailures.push("renderer must keep readable 14px relationship labels and arrow scale");
   }
-  if (!source.includes('"text-background-opacity": 0')) {
-    contractFailures.push("edge label backgrounds must stay transparent so they cannot cover nodes");
+  if (!source.includes('"text-background-opacity": 0.95') || !source.includes('"text-background-padding": "5px"')) {
+    contractFailures.push("edge labels must keep a readable background halo");
+  }
+  if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(source)) {
+    contractFailures.push("weak edge labels must not be faded by edge opacity");
   }
   if (!source.includes('"z-index": 10') || !source.includes('"z-index": 1')) {
     contractFailures.push("renderer must keep nodes layered above relationship labels and edges");
