@@ -175,7 +175,6 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     }
 
     this.cy.style().fromJson(this.createStyle()).update();
-    this.scheduleRefitGraph();
   }
 
   private observeGraphSize(graphEl: HTMLElement): void {
