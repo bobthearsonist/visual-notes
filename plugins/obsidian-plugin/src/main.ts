@@ -8,11 +8,16 @@ import {
   normalizePath,
 } from "obsidian";
 import { AnthropicExtractionError, extractGraphFromAnthropic } from "./extractor";
-import { estimateTokens, hashMarkdownSections, sha256Hash } from "./hash";
+import { estimateTokens, hashMarkdownSections, semanticMarkdownHash, sha256Hash } from "./hash";
 import { applyDeterministicLayout } from "./layout";
 import { sidecarPathForMarkdownPath, VisualNotesRenderChild } from "./renderer";
 import { mergeSectionedGraph } from "./sectioned-sidecar";
-import { parseSidecar, type VisualNotesSidecar } from "./schema";
+import {
+  parseSidecar,
+  type VisualNotesExtractionHistoryEntry,
+  type VisualNotesExtractionReason,
+  type VisualNotesSidecar,
+} from "./schema";
 import {
   currentLocalDate,
   DEFAULT_SETTINGS,
@@ -41,6 +46,8 @@ export default class VisualNotesPlugin extends Plugin {
 
   private readonly debounceTimers = new Map<string, DebouncedExtraction>();
   private readonly forceRegenerateCooldowns = new Map<string, number>();
+  private readonly activeExtractionPaths = new Set<string>();
+  private readonly pendingExtractionPaths = new Set<string>();
   private readonly pendingMountSourcePaths = new Set<string>();
   private activeRenderChild: VisualNotesRenderChild | null = null;
   private activeRenderSourcePath: string | null = null;
@@ -345,37 +352,53 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
-    const markdown = await this.app.vault.read(file);
-    const estimatedTokens = estimateTokens(markdown);
-    if (estimatedTokens > MAX_INPUT_TOKENS) {
-      new Notice(`Visual Notes: note is too large to extract (${estimatedTokens} estimated tokens).`);
+    if (this.activeExtractionPaths.has(file.path)) {
+      if (options.manual || options.force) {
+        new Notice("Visual Notes: extraction is already running for this note.");
+      } else {
+        this.pendingExtractionPaths.add(file.path);
+      }
       return;
     }
 
-    const [hash, sections] = await Promise.all([sha256Hash(markdown), hashMarkdownSections(markdown)]);
-    const sidecarPath = sidecarPathForMarkdownPath(file.path);
-    const existingSidecar = await this.readSidecarForExtraction(sidecarPath, options);
-
-    if (!options.force) {
-      if (existingSidecar?._pinned) {
-        if (options.manual) {
-          new Notice("Visual Notes: sidecar is pinned — unpin first.");
-        }
-        return;
-      }
-
-      if (existingSidecar?._lastProcessedHash === hash) {
-        if (options.manual) {
-          new Notice("Visual Notes: current note is already extracted.");
-        }
-        return;
-      }
-    }
-
+    this.activeExtractionPaths.add(file.path);
     this.activeExtractions += 1;
     this.updateStatusBar();
 
     try {
+      const markdown = await this.app.vault.read(file);
+      const estimatedTokens = estimateTokens(markdown);
+      if (estimatedTokens > MAX_INPUT_TOKENS) {
+        new Notice(`Visual Notes: note is too large to extract (${estimatedTokens} estimated tokens).`);
+        return;
+      }
+
+      const [semanticHash, rawHash, sections] = await Promise.all([
+        semanticMarkdownHash(markdown),
+        sha256Hash(markdown),
+        hashMarkdownSections(markdown),
+      ]);
+      const sidecarPath = sidecarPathForMarkdownPath(file.path);
+      const existingSidecar = await this.readSidecarForExtraction(sidecarPath, options);
+
+      if (!options.force) {
+        if (existingSidecar?._pinned) {
+          if (options.manual) {
+            new Notice("Visual Notes: sidecar is pinned — unpin first.");
+          }
+          return;
+        }
+
+        if (existingSidecar?._lastProcessedHash === semanticHash || existingSidecar?._lastProcessedHash === rawHash) {
+          if (options.manual) {
+            new Notice("Visual Notes: current note is already extracted.");
+          }
+          return;
+        }
+      }
+
+      const extractionReason = extractionReasonFor(existingSidecar, options);
+
       const extraction = await extractGraphFromAnthropic({
         apiKey: this.settings.anthropicApiKey,
         model: this.settings.model,
@@ -399,7 +422,19 @@ export default class VisualNotesPlugin extends Plugin {
         nodes: sectionedGraph.nodes,
         edges: sectionedGraph.edges,
         _sections: sectionedGraph.sections,
-        _lastProcessedHash: hash,
+        _lastProcessedHash: semanticHash,
+        _lastRawContentHash: rawHash,
+        _lastExtractionReason: extractionReason,
+        _extractionHistory: appendExtractionHistory(existingSidecar, {
+          at: new Date().toISOString(),
+          reason: extractionReason,
+          semanticHash,
+          rawHash,
+          inputTokens: extraction.usage?.inputTokens,
+          outputTokens: extraction.usage?.outputTokens,
+          totalTokens: extraction.usage?.totalTokens,
+          estimatedCostUsd: extraction.usage?.estimatedCostUsd,
+        }),
         _extractedBy: PRODUCER_ID,
         _schemaVersion: SETTINGS_VERSION,
         _pinned: options.force ? false : existingSidecar?._pinned ?? false,
@@ -426,8 +461,12 @@ export default class VisualNotesPlugin extends Plugin {
     } catch (error) {
       this.handleExtractionError(error);
     } finally {
+      this.activeExtractionPaths.delete(file.path);
       this.activeExtractions -= 1;
       this.updateStatusBar();
+      if (this.pendingExtractionPaths.delete(file.path)) {
+        this.queueExtraction(file);
+      }
     }
   }
 
@@ -576,6 +615,28 @@ type DebouncedExtraction = ReturnType<typeof debounce>;
 
 function titleForFile(file: TFile): string {
   return `Daily Overview - ${file.basename}`;
+}
+
+function extractionReasonFor(
+  existingSidecar: VisualNotesSidecar | null,
+  options: ExtractionOptions,
+): VisualNotesExtractionReason {
+  if (options.force) {
+    return "force-regenerate";
+  }
+
+  if (options.manual) {
+    return "manual-extraction";
+  }
+
+  return existingSidecar ? "semantic-content-changed" : "first-extraction";
+}
+
+function appendExtractionHistory(
+  existingSidecar: VisualNotesSidecar | null,
+  entry: VisualNotesExtractionHistoryEntry,
+): VisualNotesExtractionHistoryEntry[] {
+  return [...(existingSidecar?._extractionHistory ?? []), entry].slice(-10);
 }
 
 function findPreviewMountTarget(view: MarkdownView): HTMLElement | null {

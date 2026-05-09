@@ -9,6 +9,12 @@ const sectionIdSchema = nodeIdSchema;
 const edgeClassSchema = z.enum(["strong-edge", "weak-edge"]);
 const sidecarKindSchema = z.enum(["daily-overview", "session-whiteboard", "rollup"]);
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const extractionReasonSchema = z.enum([
+  "first-extraction",
+  "semantic-content-changed",
+  "manual-extraction",
+  "force-regenerate",
+]);
 
 const tokenUsageSchema = z
   .object({
@@ -42,6 +48,19 @@ const sectionMetadataSchema = z
     hash: sha256Schema,
     nodeIds: z.array(nodeIdSchema).max(50),
     edgeIds: z.array(nodeIdSchema).max(100),
+  })
+  .strict();
+
+const extractionHistoryEntrySchema = z
+  .object({
+    at: z.string().datetime(),
+    reason: extractionReasonSchema,
+    semanticHash: sha256Schema,
+    rawHash: sha256Schema,
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional(),
+    totalTokens: z.number().int().nonnegative().optional(),
+    estimatedCostUsd: z.number().nonnegative().optional(),
   })
   .strict();
 
@@ -83,6 +102,9 @@ export const sidecarSchema = z
     header: z.string().optional(),
     subtitle: z.string().optional(),
     _lastProcessedHash: sha256Schema.optional(),
+    _lastRawContentHash: sha256Schema.optional(),
+    _lastExtractionReason: extractionReasonSchema.optional(),
+    _extractionHistory: z.array(extractionHistoryEntrySchema).max(10).optional(),
     _extractedBy: z
       .string()
       .regex(/^[a-z][a-z0-9-]*@\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/)
@@ -122,6 +144,8 @@ export type VisualNotesNode = z.infer<typeof graphNodeSchema>;
 export type VisualNotesEdge = z.infer<typeof graphEdgeSchema>;
 export type VisualNotesSectionMetadata = z.infer<typeof sectionMetadataSchema>;
 export type VisualNotesUsage = z.infer<typeof usageSchema>;
+export type VisualNotesExtractionReason = z.infer<typeof extractionReasonSchema>;
+export type VisualNotesExtractionHistoryEntry = z.infer<typeof extractionHistoryEntrySchema>;
 
 export function parseSidecar(value: unknown): VisualNotesSidecar {
   return sidecarSchema.parse(value);

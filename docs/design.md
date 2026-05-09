@@ -179,10 +179,15 @@ Existing controls:
 
 - watched folders default to empty
 - debounce between saves
-- content hash dedup
+- semantic content hash dedup that ignores volatile frontmatter timestamps such
+  as `modified` and `updated`
 - force-regenerate cooldown
 - status bar count
 - usage metadata when available
+- per-file in-flight extraction suppression, so a local modify storm cannot run
+  overlapping API calls for the same note
+- recent extraction history in the sidecar, including reason plus raw/semantic
+  hashes, so spend spikes can be diagnosed from the generated JSON
 
 Potential additions:
 
@@ -191,6 +196,40 @@ Potential additions:
 - "Manual only" watched-folder mode.
 - Token-count preflight using Anthropic's token counting endpoint instead of a
   character heuristic.
+- Single-writer or device ownership controls for synced vaults, because multiple
+  Obsidian instances on Synology Drive can still race to regenerate the same
+  sidecar and produce `*_Conflict.json` files.
+
+Recent spend/conflict incident:
+
+- A personal daily sidecar recorded thousands of extractions and most of the
+  month-to-date Anthropic spend.
+- Synology Drive conflict files showed multiple machines regenerating the same
+  `YYYYMMDD-overview.json` sidecars with different graph contents, hashes, and
+  usage counters.
+- The canonical markdown notes were not conflicted; the conflicts were generated
+  visualization metadata.
+- Root cause class: automatic extraction in a synced folder can treat timestamp
+  churn or multi-device writes as meaningful changes unless dedupe is semantic
+  and local extraction is serialized.
+
+### Plugin-owned session visuals
+
+The current AI skill workflow can append session summaries and also generate
+`YYYYMMDD-session-N.json/html` whiteboards. The desired product direction is to
+move visual ownership into the Obsidian plugin:
+
+1. The AI skill writes only structured markdown session-summary text.
+2. The plugin parses `## AI Session Summary - ...` sections from watched daily
+   notes.
+3. The plugin writes deterministic `session-whiteboard` sidecars for each
+   summary and renders them inline below the corresponding summary heading.
+4. The plugin aggregates session sidecars into the daily `daily-overview`
+   sidecar and renders the daily visual at the top of the note.
+
+This keeps markdown as the source of truth, avoids checked-in or synced HTML
+artifacts, and lets the same renderer/layout validation protect both daily and
+per-session visuals.
 
 ### Rendering and navigation polish
 
