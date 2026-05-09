@@ -28,7 +28,49 @@
     "_lastProcessedHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the markdown body the sidecar was extracted from. Format: 'sha256:' prefix + 64 lowercase hex chars (matches Node's `crypto.createHash('sha256').digest('hex')` output WITH the 'sha256:' literal prefix prepended). Used to skip redundant API calls when the markdown hasn't changed (handles Obsidian Sync's per-device modify storm)."
+      "description": "SHA-256 hash of the semantic markdown content the sidecar was extracted from. Volatile frontmatter fields such as modified/updated timestamps are ignored before hashing. Format: 'sha256:' prefix + 64 lowercase hex chars. Used to skip redundant API calls when meaningful markdown hasn't changed."
+    },
+    "_lastRawContentHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the raw markdown content, including volatile metadata. Stored only for extraction diagnostics; _lastProcessedHash remains the semantic dedupe hash."
+    },
+    "_lastExtractionReason": {
+      "type": "string",
+      "enum": ["first-extraction", "semantic-content-changed", "manual-extraction", "force-regenerate"],
+      "description": "Reason the plugin last called the extraction API for this sidecar. Useful for diagnosing spend spikes."
+    },
+    "_extractionHistory": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Recent extraction diagnostics capped to the latest 10 API calls.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "reason", "semanticHash", "rawHash"],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["first-extraction", "semantic-content-changed", "manual-extraction", "force-regenerate"]
+          },
+          "semanticHash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "rawHash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "inputTokens": { "type": "integer", "minimum": 0 },
+          "outputTokens": { "type": "integer", "minimum": 0 },
+          "totalTokens": { "type": "integer", "minimum": 0 },
+          "estimatedCostUsd": { "type": "number", "minimum": 0 }
+        }
+      }
     },
     "_sections": {
       "type": "array",
