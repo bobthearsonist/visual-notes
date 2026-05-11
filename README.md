@@ -83,7 +83,9 @@ Feature overview:
 
 - Watches one or more configured daily-note folders.
 - Debounces saves and skips unchanged content using a markdown hash.
-- Sends the full note markdown to the Anthropic Messages API.
+- Sends structured Daily Context sources to the Anthropic Messages API when
+  the `daily-context` plugin is available, otherwise falls back to full note
+  markdown.
 - Validates the returned graph against the shared sidecar schema.
 - Writes `{date}-overview.json` next to the note.
 - Renders the sidecar inline in reading and source views.
@@ -115,7 +117,7 @@ Daily note folder
 └── 20260501-overview.json   # generated graph sidecar
 
 Obsidian plugin
-├── settings tab             # API key, watched folders, debounce, model
+├── settings tab             # API key, watched folders, debounce, model, Daily Context
 ├── file watcher             # only watched markdown files
 ├── extractor                # requestUrl -> Anthropic Messages API
 ├── schema validation        # Zod + shared/schema.json
@@ -130,6 +132,8 @@ Important invariants:
    user runs force regenerate.
 4. The renderer tolerates unsupported future sidecar kinds by showing a
    placeholder instead of crashing.
+5. Daily Context integration is optional; direct markdown extraction remains the
+   fallback when the provider is unavailable or not applicable to a note.
 
 ## Install and setup
 

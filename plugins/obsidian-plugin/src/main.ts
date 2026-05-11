@@ -7,6 +7,13 @@ import {
   TFile,
   normalizePath,
 } from "obsidian";
+import {
+  buildDailyContextExtractionInput,
+  getDailyContextApi,
+  isExtractionCurrent,
+  normalizeDailyContextDateFromPath,
+  type PreparedDailyContextExtraction,
+} from "./daily-context";
 import { AnthropicExtractionError, extractGraphFromAnthropic } from "./extractor";
 import { estimateTokens, hashMarkdownSections, semanticMarkdownHash, sha256Hash } from "./hash";
 import { applyDeterministicLayout } from "./layout";
@@ -16,8 +23,11 @@ import {
   parseSidecar,
   type VisualNotesExtractionHistoryEntry,
   type VisualNotesExtractionReason,
+  type VisualNotesProcessedHashKind,
+  type VisualNotesSourceContext,
   type VisualNotesSidecar,
 } from "./schema";
+import type { MarkdownSectionSummary } from "./sections";
 import {
   currentLocalDate,
   DEFAULT_SETTINGS,
@@ -38,6 +48,15 @@ type VisualNotesViewMode = "preview" | "source";
 interface ExtractionOptions {
   force: boolean;
   manual: boolean;
+}
+
+interface PreparedExtractionInput {
+  markdown: string;
+  sections: MarkdownSectionSummary[];
+  processedHash: string;
+  processedHashKind: VisualNotesProcessedHashKind;
+  rawHash: string;
+  sourceContext?: VisualNotesSourceContext;
 }
 
 export default class VisualNotesPlugin extends Plugin {
@@ -133,6 +152,8 @@ export default class VisualNotesPlugin extends Plugin {
         .map((folder) => folder.trim())
         .filter(Boolean),
       extractionCounter: loaded?.extractionCounter ?? { date: currentLocalDate(), count: 0 },
+      useDailyContext: loaded?.useDailyContext ?? DEFAULT_SETTINGS.useDailyContext,
+      dailyContextId: loaded?.dailyContextId?.trim() ?? DEFAULT_SETTINGS.dailyContextId,
     };
   }
 
@@ -366,18 +387,14 @@ export default class VisualNotesPlugin extends Plugin {
     this.updateStatusBar();
 
     try {
-      const markdown = await this.app.vault.read(file);
-      const estimatedTokens = estimateTokens(markdown);
+      const rawMarkdown = await this.app.vault.read(file);
+      const extractionInput = await this.prepareExtractionInput(file, rawMarkdown);
+      const estimatedTokens = estimateTokens(extractionInput.markdown);
       if (estimatedTokens > MAX_INPUT_TOKENS) {
         new Notice(`Visual Notes: note is too large to extract (${estimatedTokens} estimated tokens).`);
         return;
       }
 
-      const [semanticHash, rawHash, sections] = await Promise.all([
-        semanticMarkdownHash(markdown),
-        sha256Hash(markdown),
-        hashMarkdownSections(markdown),
-      ]);
       const sidecarPath = sidecarPathForMarkdownPath(file.path);
       const existingSidecar = await this.readSidecarForExtraction(sidecarPath, options);
 
@@ -389,7 +406,15 @@ export default class VisualNotesPlugin extends Plugin {
           return;
         }
 
-        if (existingSidecar?._lastProcessedHash === semanticHash || existingSidecar?._lastProcessedHash === rawHash) {
+        if (
+          isExtractionCurrent({
+            existingHash: existingSidecar?._lastProcessedHash,
+            existingHashKind: existingSidecar?._lastProcessedHashKind,
+            processedHash: extractionInput.processedHash,
+            processedHashKind: extractionInput.processedHashKind,
+            rawHash: extractionInput.rawHash,
+          })
+        ) {
           if (options.manual) {
             new Notice("Visual Notes: current note is already extracted.");
           }
@@ -402,15 +427,15 @@ export default class VisualNotesPlugin extends Plugin {
       const extraction = await extractGraphFromAnthropic({
         apiKey: this.settings.anthropicApiKey,
         model: this.settings.model,
-        markdown,
-        sections,
+        markdown: extractionInput.markdown,
+        sections: extractionInput.sections,
         sourcePath: file.path,
       });
       const extracted = extraction.graph;
       const sectionedGraph = mergeSectionedGraph({
         extracted,
         existing: existingSidecar,
-        sections,
+        sections: extractionInput.sections,
         force: options.force,
       });
 
@@ -422,14 +447,17 @@ export default class VisualNotesPlugin extends Plugin {
         nodes: sectionedGraph.nodes,
         edges: sectionedGraph.edges,
         _sections: sectionedGraph.sections,
-        _lastProcessedHash: semanticHash,
-        _lastRawContentHash: rawHash,
+        _lastProcessedHash: extractionInput.processedHash,
+        _lastProcessedHashKind: extractionInput.processedHashKind,
+        _lastRawContentHash: extractionInput.rawHash,
         _lastExtractionReason: extractionReason,
+        _sourceContext: extractionInput.sourceContext,
         _extractionHistory: appendExtractionHistory(existingSidecar, {
           at: new Date().toISOString(),
           reason: extractionReason,
-          semanticHash,
-          rawHash,
+          semanticHash: extractionInput.processedHash,
+          processedHashKind: extractionInput.processedHashKind,
+          rawHash: extractionInput.rawHash,
           inputTokens: extraction.usage?.inputTokens,
           outputTokens: extraction.usage?.outputTokens,
           totalTokens: extraction.usage?.totalTokens,
@@ -467,6 +495,58 @@ export default class VisualNotesPlugin extends Plugin {
       if (this.pendingExtractionPaths.delete(file.path)) {
         this.queueExtraction(file);
       }
+    }
+  }
+
+  private async prepareExtractionInput(file: TFile, rawMarkdown: string): Promise<PreparedExtractionInput> {
+    const rawHash = await sha256Hash(rawMarkdown);
+    const dailyContext = await this.prepareDailyContextExtraction(file);
+    if (dailyContext) {
+      return {
+        ...dailyContext,
+        rawHash,
+      };
+    }
+
+    const [semanticHash, sections] = await Promise.all([
+      semanticMarkdownHash(rawMarkdown),
+      hashMarkdownSections(rawMarkdown),
+    ]);
+
+    return {
+      markdown: rawMarkdown,
+      sections,
+      processedHash: semanticHash,
+      processedHashKind: "semantic-markdown",
+      rawHash,
+    };
+  }
+
+  private async prepareDailyContextExtraction(file: TFile): Promise<PreparedDailyContextExtraction | null> {
+    if (!this.settings.useDailyContext) {
+      return null;
+    }
+
+    const api = getDailyContextApi(this.app);
+    if (!api) {
+      return null;
+    }
+
+    const date = normalizeDailyContextDateFromPath(file.path);
+    if (!date) {
+      return null;
+    }
+
+    try {
+      const context = await api.getDailyContext(date, {
+        dailyPath: file.path,
+        contextId: this.settings.dailyContextId || undefined,
+      });
+      return buildDailyContextExtractionInput(context);
+    } catch (error) {
+      this.log("warn", "Daily Context extraction source failed; falling back to raw note.", error);
+      new Notice("Visual Notes: Daily Context failed; falling back to raw note. See console.");
+      return null;
     }
   }
 

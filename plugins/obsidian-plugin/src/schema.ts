@@ -9,6 +9,7 @@ const sectionIdSchema = nodeIdSchema;
 const edgeClassSchema = z.enum(["strong-edge", "weak-edge"]);
 const sidecarKindSchema = z.enum(["daily-overview", "session-whiteboard", "rollup"]);
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const processedHashKindSchema = z.enum(["semantic-markdown", "daily-context"]);
 const extractionReasonSchema = z.enum([
   "first-extraction",
   "semantic-content-changed",
@@ -56,11 +57,37 @@ const extractionHistoryEntrySchema = z
     at: z.string().datetime(),
     reason: extractionReasonSchema,
     semanticHash: sha256Schema,
+    processedHashKind: processedHashKindSchema.optional(),
     rawHash: sha256Schema,
     inputTokens: z.number().int().nonnegative().optional(),
     outputTokens: z.number().int().nonnegative().optional(),
     totalTokens: z.number().int().nonnegative().optional(),
     estimatedCostUsd: z.number().nonnegative().optional(),
+  })
+  .strict();
+
+const sourceContextSchema = z
+  .object({
+    provider: z.literal("daily-context"),
+    apiVersion: z.number().int().positive(),
+    schemaVersion: z.number().int().positive(),
+    parserVersion: z.number().int().nonnegative(),
+    contextHash: sha256Schema,
+    generatedAt: z.string().datetime(),
+    sourceCount: z.number().int().nonnegative(),
+    sources: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            kind: z.string().min(1),
+            path: z.string().min(1),
+            label: z.string().min(1),
+            hash: sha256Schema,
+          })
+          .strict(),
+      )
+      .max(200),
   })
   .strict();
 
@@ -102,9 +129,11 @@ export const sidecarSchema = z
     header: z.string().optional(),
     subtitle: z.string().optional(),
     _lastProcessedHash: sha256Schema.optional(),
+    _lastProcessedHashKind: processedHashKindSchema.optional(),
     _lastRawContentHash: sha256Schema.optional(),
     _lastExtractionReason: extractionReasonSchema.optional(),
     _extractionHistory: z.array(extractionHistoryEntrySchema).max(10).optional(),
+    _sourceContext: sourceContextSchema.optional(),
     _extractedBy: z
       .string()
       .regex(/^[a-z][a-z0-9-]*@\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/)
@@ -146,6 +175,8 @@ export type VisualNotesSectionMetadata = z.infer<typeof sectionMetadataSchema>;
 export type VisualNotesUsage = z.infer<typeof usageSchema>;
 export type VisualNotesExtractionReason = z.infer<typeof extractionReasonSchema>;
 export type VisualNotesExtractionHistoryEntry = z.infer<typeof extractionHistoryEntrySchema>;
+export type VisualNotesProcessedHashKind = z.infer<typeof processedHashKindSchema>;
+export type VisualNotesSourceContext = z.infer<typeof sourceContextSchema>;
 
 export function parseSidecar(value: unknown): VisualNotesSidecar {
   return sidecarSchema.parse(value);
