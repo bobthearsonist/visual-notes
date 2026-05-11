@@ -50,7 +50,7 @@ test("buildDailyContextExtractionInput creates deterministic source sections and
           path: "0 Daily ADHD Brain Logs/20260511.md",
           label: "Notes",
           hash: HASH_B,
-          content: "Manual note content.",
+          content: "Manual note content.\nSecond source line.",
         },
         {
           id: "ignored-empty",
@@ -85,6 +85,9 @@ test("buildDailyContextExtractionInput creates deterministic source sections and
     ["dc-daily-section-notes", "dc-daily-section-notes-2"],
   );
   assert.ok(extraction.sections.every((section) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(section.id)));
+  assert.equal(extraction.sections[0].startLine, 6);
+  assert.equal(extraction.sections[0].endLine, 15);
+  assert.equal(extraction.markdown.split("\n")[14], "Second source line.");
   assert.match(extraction.markdown, /Source ID: notes/);
   assert.match(extraction.markdown, /Section ID: dc-daily-section-notes-2/);
 });
@@ -106,6 +109,26 @@ test("buildDailyContextExtractionInput returns null when no sources have content
     ),
     null,
   );
+});
+
+test("buildDailyContextExtractionInput caps source context entries at schema maximum", () => {
+  const extraction = buildDailyContextExtractionInput(
+    dailyContext({
+      sources: Array.from({ length: 205 }, (_, index) => ({
+        id: `source-${String(index).padStart(3, "0")}`,
+        kind: "date-tagged-file",
+        path: `Projects/source-${index}.md`,
+        label: `Source ${index}`,
+        hash: HASH_B,
+        content: `Source ${index} content.`,
+      })),
+    }),
+  );
+
+  assert.ok(extraction);
+  assert.equal(extraction.sections.length, 200);
+  assert.equal(extraction.sourceContext.sourceCount, 200);
+  assert.equal(extraction.sourceContext.sources.length, 200);
 });
 
 test("isExtractionCurrent compares processed hashes by source kind and preserves legacy markdown skips", () => {

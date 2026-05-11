@@ -117,7 +117,7 @@ export function buildDailyContextExtractionInput(
   sources.forEach((source, index) => {
     const sectionId = uniqueSlug(slugify(`dc-${source.kind}-${source.id}`), usedSectionIds);
     const heading = `${source.kind}: ${source.label}`;
-    const sourceContent = source.content?.trim() ?? "";
+    const sourceContent = normalizeSourceContent(source.content ?? "");
     const startLine = lines.length + 1;
 
     lines.push(
@@ -137,7 +137,7 @@ export function buildDailyContextExtractionInput(
       );
     }
 
-    lines.push("", sourceContent, "");
+    lines.push("", ...sourceContent.split("\n"), "");
 
     sections.push({
       id: sectionId,
@@ -201,6 +201,10 @@ export function isExtractionCurrent(options: {
 
 function compareSources(left: DailyContextSource, right: DailyContextSource): number {
   return `${left.kind}:${left.path}:${left.id}`.localeCompare(`${right.kind}:${right.path}:${right.id}`);
+}
+
+function normalizeSourceContent(content: string): string {
+  return content.trim().replace(/\r\n?/g, "\n");
 }
 
 function normalizeDateMatch(value: string): string | null {
