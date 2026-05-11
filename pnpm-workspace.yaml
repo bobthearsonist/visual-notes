@@ -1,3 +1,5 @@
 packages:
   - 'plugins/*'
   - 'shared'
+allowBuilds:
+  esbuild: true

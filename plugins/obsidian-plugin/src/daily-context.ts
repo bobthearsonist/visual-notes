@@ -3,6 +3,7 @@ import type { MarkdownSectionSummary } from "./sections";
 
 const DAILY_CONTEXT_PLUGIN_ID = "daily-context";
 const SUPPORTED_DAILY_CONTEXT_API_VERSION = 1;
+const MAX_SOURCE_CONTEXT_ENTRIES = 200;
 
 export interface DailyContextApi {
   version: number;
@@ -96,7 +97,8 @@ export function buildDailyContextExtractionInput(
 ): PreparedDailyContextExtraction | null {
   const sources = context.sources
     .filter((source) => typeof source.content === "string" && source.content.trim().length > 0)
-    .sort(compareSources);
+    .sort(compareSources)
+    .slice(0, MAX_SOURCE_CONTEXT_ENTRIES);
 
   if (sources.length === 0) {
     return null;
