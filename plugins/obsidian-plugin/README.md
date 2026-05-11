@@ -70,6 +70,7 @@ After install, open Settings → Visual Notes:
 | **Watched folders** | A list of folders containing daily notes. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add multiple folders if you keep separate work/personal/project journals (e.g., `Captains Log`, `0 Daily ADHD Brain Logs`, `Projects/visual-notes/Journal`). Each folder produces its own sidecars in-place; same model, same prompt, same schema across all watched folders. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |
+| **Use Daily Context** | When the `daily-context` plugin is available, extract from structured daily sources instead of raw note markdown. |
 
 Custom prompt override is **not exposed in v0.1** — the bundled extraction
 prompt at `prompts/extract-graph.md` is the canonical heuristic source.
@@ -108,7 +109,12 @@ Bring your own API key. The plugin does not proxy or aggregate usage.
 
 ## Sources of content
 
-The plugin sees **everything** in the daily note:
+By default, the plugin extracts from the active note. When Daily Context is
+enabled and available, it extracts from that provider's structured source list
+instead. The explicit **Extract from current note using Daily Context** command
+requires the provider and does not fall back to raw markdown.
+
+Raw-note mode sees **everything** in the daily note:
 - AI session summaries written by Claude Code, OpenCode, Copilot, etc.
 - Manually typed notes
 - Mobile edits synced via Obsidian Sync
@@ -119,11 +125,11 @@ If it's in the file, the LLM extraction sees it.
 
 ## Privacy / data handling
 
-The plugin sends the **full markdown content** of the daily note to Anthropic's
-API for extraction. By default, your notes do not stay on Anthropic's servers
-beyond what's required for the API call (see [Anthropic's privacy policy](https://www.anthropic.com/legal/privacy)).
-Sensitive notes you don't want sent to a third-party API should not live
-in any watched folder.
+The plugin sends either Daily Context source content or raw note markdown to
+Anthropic's API for extraction. By default, your notes do not stay on Anthropic's
+servers beyond what's required for the API call (see [Anthropic's privacy policy](https://www.anthropic.com/legal/privacy)).
+Sensitive notes you don't want sent to a third-party API should not live in any
+watched folder or Daily Context source.
 
 ## License
 

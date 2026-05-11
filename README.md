@@ -179,6 +179,9 @@ The Obsidian command palette exposes:
 
 - **Visual Notes: Extract from current note** — manually extract the active
   markdown file unless its sidecar is pinned.
+- **Visual Notes: Extract from current note using Daily Context** — manually
+  extract through the Daily Context provider and do not fall back to raw
+  markdown if that provider is unavailable.
 - **Visual Notes: Regenerate (force)** — bypasses cached hash and pin state,
   with a per-file cooldown.
 - **Visual Notes: Pin this overview** — preserves the current sidecar from
@@ -188,9 +191,9 @@ The Obsidian command palette exposes:
 
 ## Privacy and cost
 
-Visual Notes sends the **full markdown content** of watched notes to the
-Anthropic API when extraction runs. Do not add folders containing notes you do
-not want sent to a third-party API.
+Visual Notes sends either the configured Daily Context sources or the active
+note markdown to the Anthropic API when extraction runs. Do not add folders or
+Daily Context sources containing notes you do not want sent to a third-party API.
 
 Bring your own API key; this project does not proxy requests or aggregate
 usage. At the default Haiku model, a typical extraction is designed to cost
