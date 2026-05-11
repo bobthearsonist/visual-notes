@@ -121,6 +121,11 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.observeGraphSize(graphEl);
     this.scheduleRefitGraph();
 
+    this.containerEl.createDiv({
+      cls: "visual-notes-source",
+      text: formatSourceSummary(sidecar),
+    });
+
     if (sidecar._usage) {
       this.containerEl.createDiv({
         cls: "visual-notes-usage",
@@ -395,4 +400,17 @@ function formatUsd(value: number): string {
   }
 
   return `$${value.toFixed(2)}`;
+}
+
+function formatSourceSummary(sidecar: VisualNotesSidecar): string {
+  if (sidecar._sourceContext?.provider === "daily-context") {
+    const sourceCount = sidecar._sourceContext.sourceCount;
+    return `Source: Daily Context (${sourceCount} source${sourceCount === 1 ? "" : "s"})`;
+  }
+
+  if (sidecar._lastProcessedHashKind === "semantic-markdown") {
+    return "Source: raw markdown";
+  }
+
+  return "Source: unknown";
 }

@@ -48,6 +48,7 @@ type VisualNotesViewMode = "preview" | "source";
 interface ExtractionOptions {
   force: boolean;
   manual: boolean;
+  sourceMode?: "auto" | "daily-context";
 }
 
 interface PreparedExtractionInput {
@@ -181,6 +182,14 @@ export default class VisualNotesPlugin extends Plugin {
       name: "Extract from current note",
       checkCallback: (checking) => this.withActiveMarkdownFile(checking, (file) =>
         this.extractFile(file, { force: false, manual: true }),
+      ),
+    });
+
+    this.addCommand({
+      id: "extract-current-note-daily-context",
+      name: "Extract from current note using Daily Context",
+      checkCallback: (checking) => this.withDailyContextMarkdownFile(checking, (file) =>
+        this.extractFile(file, { force: false, manual: true, sourceMode: "daily-context" }),
       ),
     });
 
@@ -345,6 +354,38 @@ export default class VisualNotesPlugin extends Plugin {
     return true;
   }
 
+  private withDailyContextMarkdownFile(
+    checking: boolean,
+    callback: (file: TFile) => Promise<void>,
+  ): boolean {
+    const file = this.app.workspace.getActiveFile();
+    const isMarkdown = file instanceof TFile && file.extension === "md";
+    const hasDailyContext = getDailyContextApi(this.app) !== null;
+    const hasDate = isMarkdown ? normalizeDailyContextDateFromPath(file.path) !== null : false;
+
+    if (checking) {
+      return isMarkdown && hasDailyContext && hasDate;
+    }
+
+    if (!isMarkdown) {
+      new Notice("Visual Notes: open a markdown daily note first.");
+      return false;
+    }
+
+    if (!hasDailyContext) {
+      new Notice("Visual Notes: Daily Context plugin API is not available.");
+      return false;
+    }
+
+    if (!hasDate) {
+      new Notice("Visual Notes: current note name does not contain a Daily Context date.");
+      return false;
+    }
+
+    void callback(file);
+    return true;
+  }
+
   private queueExtraction(file: TFile): void {
     const existing = this.debounceTimers.get(file.path);
     existing?.cancel();
@@ -388,7 +429,10 @@ export default class VisualNotesPlugin extends Plugin {
 
     try {
       const rawMarkdown = await this.app.vault.read(file);
-      const extractionInput = await this.prepareExtractionInput(file, rawMarkdown);
+      const extractionInput = await this.prepareExtractionInput(file, rawMarkdown, options);
+      if (!extractionInput) {
+        return;
+      }
       const estimatedTokens = estimateTokens(extractionInput.markdown);
       if (estimatedTokens > MAX_INPUT_TOKENS) {
         new Notice(`Visual Notes: note is too large to extract (${estimatedTokens} estimated tokens).`);
@@ -498,14 +542,22 @@ export default class VisualNotesPlugin extends Plugin {
     }
   }
 
-  private async prepareExtractionInput(file: TFile, rawMarkdown: string): Promise<PreparedExtractionInput> {
+  private async prepareExtractionInput(
+    file: TFile,
+    rawMarkdown: string,
+    options: ExtractionOptions,
+  ): Promise<PreparedExtractionInput | null> {
     const rawHash = await sha256Hash(rawMarkdown);
-    const dailyContext = await this.prepareDailyContextExtraction(file);
+    const dailyContext = await this.prepareDailyContextExtraction(file, options.sourceMode ?? "auto");
     if (dailyContext) {
       return {
         ...dailyContext,
         rawHash,
       };
+    }
+
+    if (options.sourceMode === "daily-context") {
+      return null;
     }
 
     const [semanticHash, sections] = await Promise.all([
@@ -522,18 +574,28 @@ export default class VisualNotesPlugin extends Plugin {
     };
   }
 
-  private async prepareDailyContextExtraction(file: TFile): Promise<PreparedDailyContextExtraction | null> {
-    if (!this.settings.useDailyContext) {
+  private async prepareDailyContextExtraction(
+    file: TFile,
+    sourceMode: "auto" | "daily-context",
+  ): Promise<PreparedDailyContextExtraction | null> {
+    const requiresDailyContext = sourceMode === "daily-context";
+    if (sourceMode === "auto" && !this.settings.useDailyContext) {
       return null;
     }
 
     const api = getDailyContextApi(this.app);
     if (!api) {
+      if (requiresDailyContext) {
+        new Notice("Visual Notes: Daily Context plugin API is not available.");
+      }
       return null;
     }
 
     const date = normalizeDailyContextDateFromPath(file.path);
     if (!date) {
+      if (requiresDailyContext) {
+        new Notice("Visual Notes: current note name does not contain a Daily Context date.");
+      }
       return null;
     }
 
@@ -542,10 +604,18 @@ export default class VisualNotesPlugin extends Plugin {
         dailyPath: file.path,
         contextId: this.settings.dailyContextId || undefined,
       });
-      return buildDailyContextExtractionInput(context);
+      const extractionInput = buildDailyContextExtractionInput(context);
+      if (!extractionInput && requiresDailyContext) {
+        new Notice("Visual Notes: Daily Context returned no usable source content.");
+      }
+      return extractionInput;
     } catch (error) {
       this.log("warn", "Daily Context extraction source failed; falling back to raw note.", error);
-      new Notice("Visual Notes: Daily Context failed; falling back to raw note. See console.");
+      new Notice(
+        requiresDailyContext
+          ? "Visual Notes: Daily Context extraction failed. See console."
+          : "Visual Notes: Daily Context failed; falling back to raw note. See console.",
+      );
       return null;
     }
   }
