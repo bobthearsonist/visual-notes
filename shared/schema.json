@@ -28,7 +28,12 @@
     "_lastProcessedHash": {
       "type": "string",
       "pattern": "^sha256:[a-f0-9]{64}$",
-      "description": "SHA-256 hash of the semantic markdown content the sidecar was extracted from. Volatile frontmatter fields such as modified/updated timestamps are ignored before hashing. Format: 'sha256:' prefix + 64 lowercase hex chars. Used to skip redundant API calls when meaningful markdown hasn't changed."
+      "description": "SHA-256 hash of the source content the sidecar was extracted from. For direct note extraction this is the semantic markdown hash; for Daily Context extraction this is the Daily Context contextHash. Format: 'sha256:' prefix + 64 lowercase hex chars. Used to skip redundant API calls when meaningful source content hasn't changed."
+    },
+    "_lastProcessedHashKind": {
+      "type": "string",
+      "enum": ["semantic-markdown", "daily-context"],
+      "description": "Identifies what _lastProcessedHash represents so direct markdown hashes and Daily Context hashes are compared only against the same source kind. Omitted on legacy sidecars, which are treated as semantic markdown hashes for migration compatibility."
     },
     "_lastRawContentHash": {
       "type": "string",
@@ -61,6 +66,10 @@
             "type": "string",
             "pattern": "^sha256:[a-f0-9]{64}$"
           },
+          "processedHashKind": {
+            "type": "string",
+            "enum": ["semantic-markdown", "daily-context"]
+          },
           "rawHash": {
             "type": "string",
             "pattern": "^sha256:[a-f0-9]{64}$"
@@ -69,6 +78,70 @@
           "outputTokens": { "type": "integer", "minimum": 0 },
           "totalTokens": { "type": "integer", "minimum": 0 },
           "estimatedCostUsd": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "_sourceContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Structured source metadata when the sidecar was generated from an external context provider instead of raw markdown. Currently used for Daily Context integration.",
+      "required": [
+        "provider",
+        "apiVersion",
+        "schemaVersion",
+        "parserVersion",
+        "contextHash",
+        "generatedAt",
+        "sourceCount",
+        "sources"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "const": "daily-context"
+        },
+        "apiVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parserVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contextHash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sourceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "path", "label", "hash"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "minLength": 1 },
+              "path": { "type": "string", "minLength": 1 },
+              "label": { "type": "string", "minLength": 1 },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
+          }
         }
       }
     },

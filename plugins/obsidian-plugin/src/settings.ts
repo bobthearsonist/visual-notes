@@ -17,6 +17,8 @@ export interface VisualNotesSettings {
   model: string;
   extractionCounter: ExtractionCounter;
   firstRunNoticeShown: boolean;
+  useDailyContext: boolean;
+  dailyContextId: string;
 }
 
 export const DEFAULT_SETTINGS: VisualNotesSettings = {
@@ -27,6 +29,8 @@ export const DEFAULT_SETTINGS: VisualNotesSettings = {
   model: DEFAULT_MODEL,
   extractionCounter: { date: currentLocalDate(), count: 0 },
   firstRunNoticeShown: false,
+  useDailyContext: true,
+  dailyContextId: "",
 };
 
 export function currentLocalDate(): string {
@@ -130,6 +134,33 @@ export class VisualNotesSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.model)
           .onChange(async (value) => {
             this.plugin.settings.model = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    containerEl.createEl("h3", { text: "Daily Context" });
+
+    new Setting(containerEl)
+      .setName("Use Daily Context when available")
+      .setDesc("If the Daily Context plugin is loaded, Visual Notes extracts from its structured daily sources instead of the raw note.")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.useDailyContext)
+          .onChange(async (value) => {
+            this.plugin.settings.useDailyContext = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Daily Context ID")
+      .setDesc("Optional context id to request from Daily Context, such as personal or work. Leave blank to use Daily Context defaults.")
+      .addText((text) => {
+        text
+          .setPlaceholder("personal")
+          .setValue(this.plugin.settings.dailyContextId)
+          .onChange(async (value) => {
+            this.plugin.settings.dailyContextId = value.trim();
             await this.plugin.saveSettings();
           });
       });

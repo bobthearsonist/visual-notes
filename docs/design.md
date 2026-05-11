@@ -1,7 +1,7 @@
 # Visual Notes — Living Design Document
 
 **Status:** living design notes for remaining and future work
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-11
 
 This document is intentionally future-facing. Product overview, current setup,
 and the stable architecture summary live in the top-level
@@ -27,12 +27,15 @@ These are the constraints future changes should not casually break:
 
 The Obsidian plugin has an MVP implementation:
 
-- settings tab for API key, watched folders, debounce, and model
+- settings tab for API key, watched folders, debounce, model, and optional
+  Daily Context use
 - watched-folder save handling with debounce
 - content hash dedup via `_lastProcessedHash`
 - Anthropic Messages API extraction through Obsidian `requestUrl`
 - tool-based structured graph output validated with Zod
 - sidecar writes stamped with producer/schema/hash/pin/usage metadata
+- optional `daily-context` provider support that extracts from structured daily
+  sources and stamps `_sourceContext` metadata
 - inline Cytoscape rendering in Obsidian
 - status bar extraction count
 - command palette controls for extract, force-regenerate, pin, unpin, and
@@ -188,6 +191,8 @@ Existing controls:
   overlapping API calls for the same note
 - recent extraction history in the sidecar, including reason plus raw/semantic
   hashes, so spend spikes can be diagnosed from the generated JSON
+- optional Daily Context source hashing, so overview extraction can be keyed to
+  configured day sources instead of the entire raw daily note
 
 Potential additions:
 
