@@ -9,6 +9,8 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "typecheck": "tsc -noEmit -skipLibCheck",
     "test:feature": "node test/run-feature-tests.mjs",
+    "test:local": "node test/local/run-local-tests.mjs",
+    "test:local:anthropic": "node test/local/run-local-anthropic.mjs",
     "lint": "tsc -noEmit -skipLibCheck",
     "validate": "npm run typecheck && npm run validate:layout && npm run validate:renderer",
     "validate:layout": "node scripts/layout-metrics.mjs",

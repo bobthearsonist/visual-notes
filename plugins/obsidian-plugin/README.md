@@ -107,6 +107,30 @@ schedule. Total: **~$2-5/month**.
 
 Bring your own API key. The plugin does not proxy or aggregate usage.
 
+### Local-only integration profile
+
+Default tests use public fixtures and do not call Anthropic. To verify a private
+Daily Context output locally, copy `test/local/local-profile.example.json` to a
+gitignored `test/local/<name>.local.json` and run:
+
+```bash
+VISUAL_NOTES_LOCAL_PROFILE=test/local/<name>.local.json npm run test:local
+```
+
+To run the optional Anthropic smoke test, first generate the local extraction
+output, then copy `test/local/local-anthropic.example.json` to a gitignored
+profile with `"allowAnthropic": true` and run with all gates enabled:
+
+```bash
+VISUAL_NOTES_RUN_LOCAL_ANTHROPIC=1 \
+ANTHROPIC_API_KEY=... \
+VISUAL_NOTES_LOCAL_ANTHROPIC_PROFILE=test/local/<name>.local.json \
+npm run test:local:anthropic
+```
+
+The Anthropic smoke test is never part of default validation. It prints only
+redacted metadata and never commits prompts, source text, or generated graphs.
+
 ## Sources of content
 
 By default, the plugin extracts from the active note. When Daily Context is

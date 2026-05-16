@@ -1,0 +1,7 @@
+{
+  "allowAnthropic": false,
+  "extractionPath": "test/local/.output/extraction.local.json",
+  "model": "claude-haiku-4-5",
+  "maxEstimatedInputTokens": 12000,
+  "minNodes": 1
+}

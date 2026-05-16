@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 2,
+  "parserVersion": 2,
+  "generatedAt": "2026-05-11T12:00:00.000Z",
+  "date": "2026-05-11",
+  "dateTag": "date/2026/05/11",
+  "dateTagSource": "convention",
+  "contextHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "contexts": [
+    {
+      "id": "journal",
+      "dailyFolder": "Journal",
+      "sessionFolder": "Sessions"
+    }
+  ],
+  "sources": [
+    {
+      "id": "daily-prelude-journal-20260511",
+      "kind": "daily-prelude",
+      "path": "Journal/20260511.md",
+      "label": "Daily prelude",
+      "hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "content": "Journal prelude line."
+    },
+    {
+      "id": "daily-section-journal-notes",
+      "kind": "daily-section",
+      "path": "Journal/20260511.md",
+      "label": "Notes",
+      "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "content": "Journal note body.\n\n## Nested Thread\n\nNested journal detail.",
+      "sections": [
+        {
+          "heading": "Notes",
+          "level": 1,
+          "hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "content": "Journal note body.\n\n## Nested Thread\n\nNested journal detail."
+        }
+      ]
+    },
+    {
+      "id": "related-summary",
+      "kind": "date-tagged-file",
+      "path": "Related/project.md",
+      "label": "Summary",
+      "hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "content": "Related project summary without rendered query output.",
+      "sections": [
+        {
+          "heading": "Summary",
+          "level": 1,
+          "hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "content": "Related project summary without rendered query output."
+        }
+      ]
+    }
+  ]
+}

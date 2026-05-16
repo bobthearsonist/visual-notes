@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
 import {
   buildDailyContextExtractionInput,
@@ -90,6 +92,31 @@ test("buildDailyContextExtractionInput creates deterministic source sections and
   assert.equal(extraction.markdown.split("\n")[14], "Second source line.");
   assert.match(extraction.markdown, /Source ID: notes/);
   assert.match(extraction.markdown, /Section ID: dc-daily-section-notes-2/);
+});
+
+test("buildDailyContextExtractionInput consumes representative fixture output", () => {
+  const fixture = JSON.parse(
+    readFileSync(resolve("test/fixtures/daily-context/generic-context.json"), "utf8"),
+  ) as DailyContext;
+  const extraction = buildDailyContextExtractionInput(fixture);
+
+  assert.ok(extraction);
+  assert.equal(extraction.processedHash, fixture.contextHash);
+  assert.equal(extraction.processedHashKind, "daily-context");
+  assert.equal(extraction.sourceContext.provider, "daily-context");
+  assert.equal(extraction.sourceContext.schemaVersion, 2);
+  assert.equal(extraction.sourceContext.sourceCount, 3);
+  assert.deepEqual(
+    extraction.sections.map((section) => section.id),
+    [
+      "dc-daily-prelude-daily-prelude-journal-20260511",
+      "dc-daily-section-daily-section-journal-notes",
+      "dc-date-tagged-file-related-summary",
+    ],
+  );
+  assert.match(extraction.markdown, /Source kind: daily-section/);
+  assert.match(extraction.markdown, /Related project summary/);
+  assert.doesNotMatch(extraction.markdown, /```dataview|```tasks/u);
 });
 
 test("buildDailyContextExtractionInput returns null when no sources have content", () => {
