@@ -1,0 +1,4 @@
+{
+  "contextPath": "/absolute/path/to/gitignored/context.local.json",
+  "extractionOutputPath": "test/local/.output/extraction.local.json"
+}
