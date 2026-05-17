@@ -37,7 +37,7 @@ export interface DailyContext {
 export interface DailyContextGroup {
   id: string;
   dailyFolder: string;
-  sessionFolder: string;
+  aiSessionFolders: string[];
 }
 
 export interface DailyContextSource {

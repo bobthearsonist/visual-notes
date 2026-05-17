@@ -104,7 +104,7 @@ test("buildDailyContextExtractionInput consumes representative fixture output", 
   assert.equal(extraction.processedHash, fixture.contextHash);
   assert.equal(extraction.processedHashKind, "daily-context");
   assert.equal(extraction.sourceContext.provider, "daily-context");
-  assert.equal(extraction.sourceContext.schemaVersion, 2);
+  assert.equal(extraction.sourceContext.schemaVersion, 3);
   assert.equal(extraction.sourceContext.sourceCount, 3);
   assert.deepEqual(
     extraction.sections.map((section) => section.id),
@@ -193,13 +193,13 @@ test("isExtractionCurrent compares processed hashes by source kind and preserves
 
 function dailyContext(overrides: Partial<DailyContext> = {}): DailyContext {
   return {
-    schemaVersion: 1,
+    schemaVersion: 3,
     parserVersion: 1,
     generatedAt: "2026-05-11T21:00:00.000Z",
     date: "2026-05-11",
     dateTag: "date/2026/05/11",
     contextHash: HASH_A,
-    contexts: [{ id: "personal", dailyFolder: "0 Daily ADHD Brain Logs", sessionFolder: "0 AI Sessions" }],
+    contexts: [{ id: "personal", dailyFolder: "0 Daily ADHD Brain Logs", aiSessionFolders: ["0 AI Sessions"] }],
     sources: [],
     ...overrides,
   };
