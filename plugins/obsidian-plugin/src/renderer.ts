@@ -119,6 +119,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       maxZoom: 3,
       wheelSensitivity: 0.3,
     });
+    this.bindHoverInteractions();
     this.observeGraphSize(graphEl);
     this.scheduleRefitGraph();
 
@@ -329,6 +330,34 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     ];
 
     return stylesheet as cytoscape.StylesheetJson;
+  }
+
+  private bindHoverInteractions(): void {
+    if (!this.cy) return;
+
+    const highlight = getCssVariable(
+      getComputedStyle(this.containerEl),
+      "--interactive-accent",
+      "#2563eb",
+    );
+
+    this.cy.on("mouseover", "node", (evt) => {
+      evt.target.style("border-width", 4);
+      evt.target.connectedEdges().style({
+        "line-color": highlight,
+        "target-arrow-color": highlight,
+        width: 5,
+      });
+    });
+
+    this.cy.on("mouseout", "node", (evt) => {
+      evt.target.style("border-width", 2);
+      evt.target.connectedEdges().forEach((edge: cytoscape.EdgeSingular) => {
+        edge.removeStyle("line-color");
+        edge.removeStyle("target-arrow-color");
+        edge.removeStyle("width");
+      });
+    });
   }
 
   private prepareVisibleContainer(): void {

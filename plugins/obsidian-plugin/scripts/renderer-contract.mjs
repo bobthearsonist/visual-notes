@@ -153,6 +153,12 @@ function evaluateRendererSourceContract(source) {
   if (!source.includes("wheelSensitivity: 0.3")) {
     contractFailures.push("renderer must keep wheelSensitivity 0.3 for smooth zoom (#21)");
   }
+  if (!source.includes("bindHoverInteractions") || !source.includes('cy.on("mouseover"')) {
+    contractFailures.push("renderer must bind hover handlers for edge highlighting");
+  }
+  if (!source.includes("--interactive-accent")) {
+    contractFailures.push("renderer must use Obsidian's --interactive-accent for hover color");
+  }
 
   return contractFailures;
 }
