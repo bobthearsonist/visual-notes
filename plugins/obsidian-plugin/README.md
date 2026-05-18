@@ -155,6 +155,16 @@ servers beyond what's required for the API call (see [Anthropic's privacy policy
 Sensitive notes you don't want sent to a third-party API should not live in any
 watched folder or Daily Context source.
 
+### Why my old `*-overview.html` files aren't being updated
+
+The plugin reads `*-overview.json` sidecars and renders them inline
+in Obsidian. The static HTML files some older vaults contain were
+produced by a legacy agent-curated workflow that is no longer the
+target architecture. The HTMLs remain on disk as reference but the
+plugin doesn't regenerate or read them. See
+[the design notes](../../docs/design.md#legacy-hook-artifacts-vs-plugin-renderer)
+for context.
+
 ## License
 
 MIT — see [`../../LICENSE`](../../LICENSE).
