@@ -1,15 +1,5 @@
 import type { VisualNotesEdge, VisualNotesNode, VisualNotesSidecar } from "./schema";
 
-const CANVAS_START_X = 110;
-const CANVAS_START_Y = 110;
-const COMPONENT_GAP_X = 220;
-const COMPONENT_GAP_Y = 160;
-const COMPONENT_ROW_WIDTH = 1100;
-const NODE_GAP_X = 170;
-const NODE_GAP_Y = 125;
-const FLAT_BOARD_MAX_NODES = 28;
-const FLAT_BOARD_TARGET_ROWS = 4;
-const FLAT_BOARD_MAX_COLUMNS = 6;
 const READABLE_CARD_WIDTH = 1120;
 const READABLE_CARD_HEIGHT = 520;
 const FIT_PADDING_X = 100;
@@ -17,8 +7,6 @@ const FIT_PADDING_Y = 100;
 const COLLISION_RADIUS_X = 140;
 const COLLISION_RADIUS_Y = 70;
 const NODE_FONT_SIZE = 13;
-const VISIBLE_MIN_X = 20;
-const VISIBLE_MIN_Y = 40;
 const MAX_X = 5000;
 const MAX_Y = 3000;
 const SCHEMA_MIN_X = -200;
@@ -47,12 +35,6 @@ interface Component {
   nodes: NodeInfo[];
   score: number;
   anchorId: string;
-}
-
-interface ComponentLayout {
-  positions: Map<string, Position>;
-  width: number;
-  height: number;
 }
 
 interface Bounds {
@@ -357,116 +339,6 @@ function emptyMetrics(edgeCount: number, weakEdgeCount: number): LayoutMetrics {
   };
 }
 
-function layoutNodes(nodes: VisualNotesNode[], edges: VisualNotesEdge[]): VisualNotesNode[] {
-  if (nodes.length === 0) {
-    return [];
-  }
-
-  const infoById = buildInfoById(nodes, edges);
-  if (nodes.length <= FLAT_BOARD_MAX_NODES) {
-    const components = buildVisualComponents(nodes, edges, infoById);
-    const orderedNodes = components.flatMap((component) => orderComponentNodes(component.nodes, edges));
-    const flatPositions = layoutFlatBoard(orderedNodes, edges);
-    return nodes.map((node) => ({
-      ...node,
-      position: flatPositions.get(node.data.id) ?? node.position,
-    }));
-  }
-
-  const components = buildVisualComponents(nodes, edges, infoById);
-  const packedPositions = packComponents(components.map((component) => layoutComponent(component, edges)));
-
-  return nodes.map((node) => ({
-    ...node,
-    position: packedPositions.get(node.data.id) ?? node.position,
-  }));
-}
-
-function layoutFlatBoard(nodes: NodeInfo[], edges: VisualNotesEdge[]): Map<string, Position> {
-  const positions = new Map<string, Position>();
-  const columns = Math.min(
-    FLAT_BOARD_MAX_COLUMNS,
-    Math.max(1, Math.ceil(nodes.length / FLAT_BOARD_TARGET_ROWS)),
-  );
-  const slots = nodes.map((_, index): Position => {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    return {
-      x: CANVAS_START_X + column * NODE_GAP_X,
-      y: CANVAS_START_Y + row * NODE_GAP_Y,
-    };
-  });
-  const orderedNodes = optimizeFlatBoardOrder(nodes, slots, edges);
-
-  orderedNodes.forEach((node, index) => {
-    positions.set(node.id, slots[index] ?? node.node.position);
-  });
-
-  return positions;
-}
-
-function optimizeFlatBoardOrder(
-  nodes: NodeInfo[],
-  slots: Position[],
-  edges: VisualNotesEdge[],
-): NodeInfo[] {
-  const seeds = [
-    nodes,
-    [...nodes].sort((left, right) => left.index - right.index),
-    [...nodes].sort((left, right) => scoreNode(right) - scoreNode(left) || left.index - right.index),
-  ];
-
-  return seeds
-    .map((seed) => improveFlatBoardOrder(seed, slots, edges))
-    .sort((left, right) => flatBoardCost(left, slots, edges) - flatBoardCost(right, slots, edges))[0];
-}
-
-function improveFlatBoardOrder(
-  seed: NodeInfo[],
-  slots: Position[],
-  edges: VisualNotesEdge[],
-): NodeInfo[] {
-  const order = [...seed];
-  let currentCost = flatBoardCost(order, slots, edges);
-  let improved = true;
-  let pass = 0;
-
-  while (improved && pass < 8) {
-    improved = false;
-    pass += 1;
-
-    for (let left = 0; left < order.length - 1; left += 1) {
-      for (let right = left + 1; right < order.length; right += 1) {
-        [order[left], order[right]] = [order[right], order[left]];
-        const nextCost = flatBoardCost(order, slots, edges);
-        if (nextCost < currentCost) {
-          currentCost = nextCost;
-          improved = true;
-        } else {
-          [order[left], order[right]] = [order[right], order[left]];
-        }
-      }
-    }
-  }
-
-  return order;
-}
-
-function flatBoardCost(order: NodeInfo[], slots: Position[], edges: VisualNotesEdge[]): number {
-  const positionById = new Map(order.map((node, index): [string, Position] => [node.id, slots[index]]));
-  const primaryEdges = getPrimaryEdges(edges);
-  const weakEdges = edges.filter((edge) => edge.classes === "weak-edge");
-  const crossingCost = countCrossingsForPositions(positionById, primaryEdges) * 10000;
-  const primaryLengthCost = edgeLengthCost(positionById, primaryEdges) * 5;
-  const weakLengthCost = edgeLengthCost(positionById, weakEdges);
-  const storyOrderCost = order.reduce(
-    (cost, node, index) => cost + Math.abs(node.index - index) * 0.5,
-    0,
-  );
-
-  return crossingCost + primaryLengthCost + weakLengthCost + storyOrderCost;
-}
-
 function buildInfoById(
   nodes: VisualNotesNode[],
   edges: VisualNotesEdge[],
@@ -491,6 +363,9 @@ function buildInfoById(
   );
 }
 
+// Retained for calculateLayoutMetrics' component stats. The repair pass
+// added in #21 does not lay out by component; this function is only
+// reached through metrics calculation.
 function buildVisualComponents(
   nodes: VisualNotesNode[],
   edges: VisualNotesEdge[],
@@ -569,116 +444,6 @@ function findSingletonStoryTarget(
           b.score - a.score,
       )[0] ?? storyComponents[0]
   );
-}
-
-function layoutComponent(component: Component, edges: VisualNotesEdge[]): ComponentLayout {
-  const positions = new Map<string, Position>();
-  const orderedNodes = orderComponentNodes(component.nodes, edges);
-  const columns = columnCountForComponent(orderedNodes.length);
-
-  orderedNodes.forEach((node, index) => {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    positions.set(node.id, {
-      x: column * NODE_GAP_X,
-      y: row * NODE_GAP_Y,
-    });
-  });
-
-  const normalized = normalizePositions(positions);
-  const bounds = boundsForPositions(Array.from(normalized.values()));
-
-  return {
-    positions: normalized,
-    width: bounds.width,
-    height: bounds.height,
-  };
-}
-
-function orderComponentNodes(nodes: NodeInfo[], edges: VisualNotesEdge[]): NodeInfo[] {
-  const anchor = selectAnchor(nodes);
-  const remaining = new Map(nodes.filter((node) => node.id !== anchor.id).map((node) => [node.id, node]));
-  const ordered = [anchor];
-
-  while (remaining.size > 0) {
-    const next = Array.from(remaining.values()).sort((left, right) => {
-      const leftConnected = isConnectedToAny(left, ordered, edges) ? 0 : 1;
-      const rightConnected = isConnectedToAny(right, ordered, edges) ? 0 : 1;
-      return leftConnected - rightConnected || scoreNode(right) - scoreNode(left) || left.index - right.index;
-    })[0];
-    ordered.push(next);
-    remaining.delete(next.id);
-  }
-
-  return ordered;
-}
-
-function isConnectedToAny(node: NodeInfo, placedNodes: NodeInfo[], edges: VisualNotesEdge[]): boolean {
-  const placedIds = new Set(placedNodes.map((placedNode) => placedNode.id));
-  return edges.some(
-    (edge) =>
-      (edge.data.source === node.id && placedIds.has(edge.data.target)) ||
-      (edge.data.target === node.id && placedIds.has(edge.data.source)),
-  );
-}
-
-function columnCountForComponent(nodeCount: number): number {
-  if (nodeCount <= 2) {
-    return nodeCount;
-  }
-  if (nodeCount <= 6) {
-    return 3;
-  }
-  return 4;
-}
-
-function selectAnchor(nodes: NodeInfo[]): NodeInfo {
-  const systems = nodes.filter((node) => node.type === "system");
-  return sortNodes(systems.length > 0 ? systems : nodes)[0];
-}
-
-function normalizePositions(positions: Map<string, Position>): Map<string, Position> {
-  const bounds = boundsForPositions(Array.from(positions.values()));
-  const normalized = new Map<string, Position>();
-
-  positions.forEach((position, id) => {
-    normalized.set(id, {
-      x: Math.round(position.x - bounds.minX),
-      y: Math.round(position.y - bounds.minY),
-    });
-  });
-
-  return normalized;
-}
-
-function packComponents(layouts: ComponentLayout[]): Map<string, Position> {
-  const packed = new Map<string, Position>();
-  let x = CANVAS_START_X;
-  let y = CANVAS_START_Y;
-  let rowHeight = 0;
-
-  layouts.forEach((layout) => {
-    if (x > CANVAS_START_X && x + layout.width - CANVAS_START_X > COMPONENT_ROW_WIDTH) {
-      x = CANVAS_START_X;
-      y += rowHeight + COMPONENT_GAP_Y;
-      rowHeight = 0;
-    }
-
-    layout.positions.forEach((position, id) => {
-      packed.set(
-        id,
-        clampPosition({
-          x: x + position.x,
-          y: y + position.y,
-        }),
-      );
-    });
-
-    x += Math.max(layout.width, NODE_GAP_X) + COMPONENT_GAP_X;
-    rowHeight = Math.max(rowHeight, layout.height);
-  });
-
-  return packed;
 }
 
 function getPrimaryEdges(edges: VisualNotesEdge[]): VisualNotesEdge[] {
@@ -890,14 +655,6 @@ function countCrossingsForPositions(
   return crossings;
 }
 
-function edgeLengthCost(positionById: Map<string, Position>, edges: VisualNotesEdge[]): number {
-  return edges.reduce((sum, edge) => {
-    const source = positionById.get(edge.data.source);
-    const target = positionById.get(edge.data.target);
-    return source && target ? sum + distance(source, target) : sum;
-  }, 0);
-}
-
 function edgesShareEndpoint(left: VisualNotesEdge, right: VisualNotesEdge): boolean {
   return (
     left.data.source === right.data.source ||
@@ -994,9 +751,3 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function clampPosition(position: Position): Position {
-  return {
-    x: clamp(Math.round(position.x), VISIBLE_MIN_X, MAX_X),
-    y: clamp(Math.round(position.y), VISIBLE_MIN_Y, MAX_Y),
-  };
-}
