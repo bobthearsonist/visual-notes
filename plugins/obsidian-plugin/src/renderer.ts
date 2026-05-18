@@ -117,6 +117,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       style: this.createStyle(),
       minZoom: 0.1,
       maxZoom: 3,
+      wheelSensitivity: 0.3,
     });
     this.observeGraphSize(graphEl);
     this.scheduleRefitGraph();
