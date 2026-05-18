@@ -1,0 +1,221 @@
+{
+  "kind": "daily-overview",
+  "title": "Daily Overview - 2026-05-15",
+  "header": "Daily Overview",
+  "subtitle": "2026-05-15 - Bug 156294 PR #22074 rolled back from CDP to Lock+TOCTOU",
+  "nodes": [
+    {
+      "data": {
+        "id": "bug-156294",
+        "label": "Bug 156294\norphaned golden records"
+      },
+      "classes": "decision active",
+      "position": {
+        "x": 600,
+        "y": 80
+      }
+    },
+    {
+      "data": {
+        "id": "pr-22074",
+        "label": "PR #22074"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 600,
+        "y": 190
+      }
+    },
+    {
+      "data": {
+        "id": "lock-toctou",
+        "label": "Lock + TOCTOU\nchosen"
+      },
+      "classes": "decision completed",
+      "position": {
+        "x": 350,
+        "y": 300
+      }
+    },
+    {
+      "data": {
+        "id": "atomic-filter",
+        "label": "Atomic filter\nstashed"
+      },
+      "classes": "decision blocked",
+      "position": {
+        "x": 870,
+        "y": 300
+      }
+    },
+    {
+      "data": {
+        "id": "cdp",
+        "label": "CDP 1.1.0.777-pr\nblocked"
+      },
+      "classes": "system blocked",
+      "position": {
+        "x": 1050,
+        "y": 200
+      }
+    },
+    {
+      "data": {
+        "id": "private-hotfix",
+        "label": "private-hotfix\n2025R4-aaa-wandcny"
+      },
+      "classes": "system completed",
+      "position": {
+        "x": 110,
+        "y": 300
+      }
+    },
+    {
+      "data": {
+        "id": "cdp-stashed",
+        "label": "bug/156294\ncdp-approach-stashed"
+      },
+      "classes": "system blocked",
+      "position": {
+        "x": 1050,
+        "y": 410
+      }
+    },
+    {
+      "data": {
+        "id": "cluster-publisher",
+        "label": "ClusterPublisher"
+      },
+      "classes": "system completed",
+      "position": {
+        "x": 350,
+        "y": 420
+      }
+    },
+    {
+      "data": {
+        "id": "rebased",
+        "label": "Rebased\n7 CDP commits dropped"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 470,
+        "y": 530
+      }
+    },
+    {
+      "data": {
+        "id": "diag-tests",
+        "label": "Diagnostic tests port\n+ [Ignore] race test"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 700,
+        "y": 530
+      }
+    },
+    {
+      "data": {
+        "id": "tests-pass",
+        "label": "Tests pass\n1487 unit + 4 integration"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 600,
+        "y": 640
+      }
+    },
+    {
+      "data": {
+        "id": "regression-monday",
+        "label": "Basic matching\nregression test (Mon)"
+      },
+      "classes": "task active",
+      "position": {
+        "x": 600,
+        "y": 750
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "source": "bug-156294",
+        "target": "pr-22074",
+        "label": "fixed by"
+      }
+    },
+    {
+      "data": {
+        "source": "pr-22074",
+        "target": "lock-toctou",
+        "label": "uses"
+      }
+    },
+    {
+      "data": {
+        "source": "pr-22074",
+        "target": "atomic-filter",
+        "label": "rolled back from"
+      },
+      "classes": "cross-domain"
+    },
+    {
+      "data": {
+        "source": "cdp",
+        "target": "atomic-filter",
+        "label": "blocks"
+      }
+    },
+    {
+      "data": {
+        "source": "private-hotfix",
+        "target": "lock-toctou",
+        "label": "shipped with"
+      }
+    },
+    {
+      "data": {
+        "source": "cdp-stashed",
+        "target": "atomic-filter",
+        "label": "preserves"
+      },
+      "classes": "cross-domain"
+    },
+    {
+      "data": {
+        "source": "lock-toctou",
+        "target": "cluster-publisher",
+        "label": "lives in"
+      }
+    },
+    {
+      "data": {
+        "source": "pr-22074",
+        "target": "rebased",
+        "label": "via"
+      }
+    },
+    {
+      "data": {
+        "source": "pr-22074",
+        "target": "diag-tests",
+        "label": "gained"
+      }
+    },
+    {
+      "data": {
+        "source": "pr-22074",
+        "target": "tests-pass",
+        "label": "validated by"
+      }
+    },
+    {
+      "data": {
+        "source": "tests-pass",
+        "target": "regression-monday",
+        "label": "still pending"
+      }
+    }
+  ]
+}
