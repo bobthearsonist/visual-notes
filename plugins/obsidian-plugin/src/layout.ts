@@ -101,7 +101,102 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
 }
 
 function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
-  return resolveCollisions(clampOffCanvas(nodes));
+  return resolveCollisions(clampOffCanvas(assignMissingPositions(nodes)));
+}
+
+function assignMissingPositions(nodes: VisualNotesNode[]): VisualNotesNode[] {
+  const placed = nodes.filter((node) => !isMissingPosition(node.position));
+  const missing = nodes.filter((node) => isMissingPosition(node.position));
+
+  if (missing.length === 0) {
+    return nodes;
+  }
+
+  const anchor = centroidOrDefault(placed.map((n) => n.position));
+  let cursor = 0;
+
+  const assigned = new Map<string, { x: number; y: number }>();
+  for (const node of missing) {
+    const slot = findFreeSlot(anchor, cursor, [...placed, ...nodesFromAssigned(assigned, nodes)]);
+    assigned.set(node.data.id, slot);
+    cursor += 1;
+  }
+
+  return nodes.map((node) => {
+    const slot = assigned.get(node.data.id);
+    return slot ? { ...node, position: slot } : node;
+  });
+}
+
+function isMissingPosition(position: { x: number; y: number }): boolean {
+  return position.x === 0 && position.y === 0;
+}
+
+function centroidOrDefault(positions: { x: number; y: number }[]): { x: number; y: number } {
+  if (positions.length === 0) {
+    return { x: 400, y: 300 };
+  }
+  return calculateCentroid(positions);
+}
+
+function findFreeSlot(
+  anchor: { x: number; y: number },
+  cursor: number,
+  placed: VisualNotesNode[],
+): { x: number; y: number } {
+  // Spiral outwards from the anchor in COLLISION_RADIUS_X increments
+  // until we find a slot the collision pass would accept.
+  const radii = [0, 1, 2, 3, 4, 5];
+  for (const radius of radii) {
+    const candidates = ringCandidates(anchor, radius);
+    for (let i = 0; i < candidates.length; i += 1) {
+      const candidate = candidates[(cursor + i) % candidates.length];
+      const clamped = {
+        x: clamp(Math.round(candidate.x), SCHEMA_MIN_X, SCHEMA_MAX_X),
+        y: clamp(Math.round(candidate.y), SCHEMA_MIN_Y, SCHEMA_MAX_Y),
+      };
+      if (!hasCollision(clamped, placed)) {
+        return clamped;
+      }
+    }
+  }
+  // Last-resort fallback: drop on the anchor (collisions later resolved by resolveCollisions).
+  return {
+    x: clamp(Math.round(anchor.x), SCHEMA_MIN_X, SCHEMA_MAX_X),
+    y: clamp(Math.round(anchor.y), SCHEMA_MIN_Y, SCHEMA_MAX_Y),
+  };
+}
+
+function ringCandidates(
+  anchor: { x: number; y: number },
+  radius: number,
+): { x: number; y: number }[] {
+  if (radius === 0) {
+    return [{ x: anchor.x, y: anchor.y }];
+  }
+  const stepX = COLLISION_RADIUS_X;
+  const stepY = COLLISION_RADIUS_Y;
+  const candidates: { x: number; y: number }[] = [];
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) {
+        continue;
+      }
+      candidates.push({ x: anchor.x + dx * stepX, y: anchor.y + dy * stepY });
+    }
+  }
+  return candidates;
+}
+
+function nodesFromAssigned(
+  assigned: Map<string, { x: number; y: number }>,
+  originals: VisualNotesNode[],
+): VisualNotesNode[] {
+  // Wrap assigned coordinates as VisualNotesNode-shaped objects so hasCollision can use them.
+  return Array.from(assigned.entries()).map(([id, position]) => {
+    const original = originals.find((node) => node.data.id === id);
+    return original ? { ...original, position } : ({ data: { id, label: id }, classes: "", position } as VisualNotesNode);
+  });
 }
 
 function clampOffCanvas(nodes: VisualNotesNode[]): VisualNotesNode[] {

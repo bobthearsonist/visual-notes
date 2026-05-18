@@ -25,6 +25,11 @@ function loadNarrativeFixture(): VisualNotesSidecar {
   return JSON.parse(raw) as VisualNotesSidecar;
 }
 
+const SCHEMA_MIN_X_BOUND = -200;
+const SCHEMA_MAX_X_BOUND = 5000;
+const SCHEMA_MIN_Y_BOUND = -200;
+const SCHEMA_MAX_Y_BOUND = 3000;
+
 describe("applyDeterministicLayout — repair pass", () => {
   it("preserves well-placed LLM positions unchanged", () => {
     const sidecar = loadNarrativeFixture();
@@ -90,5 +95,30 @@ describe("applyDeterministicLayout — repair pass", () => {
     const result = applyDeterministicLayout(sidecar);
     const anchor = result.nodes.find((n) => n.data.id === "anchor")!;
     assert.deepEqual(anchor.position, { x: 500, y: 400 }, "anchor untouched");
+  });
+
+  it("assigns a visible position to a node with missing coordinates", () => {
+    const sidecar = makeSidecar([
+      { id: "placed-a", classes: "system context", position: { x: 200, y: 200 } },
+      { id: "placed-b", classes: "system context", position: { x: 600, y: 200 } },
+      { id: "ghost",    classes: "system context", position: { x: 0,   y: 0   } },
+    ]);
+
+    const result = applyDeterministicLayout(sidecar);
+    const ghost = result.nodes.find((n) => n.data.id === "ghost")!;
+
+    assert.ok(
+      ghost.position.x >= SCHEMA_MIN_X_BOUND && ghost.position.x <= SCHEMA_MAX_X_BOUND,
+      `ghost x ${ghost.position.x} should be inside schema bounds`,
+    );
+    assert.ok(
+      ghost.position.y >= SCHEMA_MIN_Y_BOUND && ghost.position.y <= SCHEMA_MAX_Y_BOUND,
+      `ghost y ${ghost.position.y} should be inside schema bounds`,
+    );
+    // It must not still be at (0,0): assignment moved it.
+    assert.ok(
+      !(ghost.position.x === 0 && ghost.position.y === 0),
+      "ghost was assigned a non-zero position",
+    );
   });
 });
