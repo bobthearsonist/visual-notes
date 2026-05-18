@@ -302,22 +302,22 @@ async function evaluateRenderPersistence() {
     persistenceFailures.push("renderer must keep all sidecar edge labels visible like the MVP hook renderer");
   }
   if (
-    !rendererSource.includes('"font-size": 13') ||
-    !rendererSource.includes('"font-weight": 600') ||
-    !rendererSource.includes("width: 118") ||
-    !rendererSource.includes("height: 54")
+    !rendererSource.includes('"font-size": 11') ||
+    !rendererSource.includes('"font-weight": 500') ||
+    !rendererSource.includes('width: "label"') ||
+    !rendererSource.includes('height: "label"')
   ) {
-    persistenceFailures.push("renderer node sizing should use readable compact paint-safe 13px nodes");
+    persistenceFailures.push("renderer node sizing should use label-sized 11px/500-weight nodes (#21)");
   }
   if (
-    !rendererSource.includes('"font-size": 14') ||
-    !rendererSource.includes('"font-weight": 700') ||
-    !rendererSource.includes('"arrow-scale": 0.8')
+    !rendererSource.includes('"font-size": 11') ||
+    !rendererSource.includes('"font-weight": "normal"') ||
+    !rendererSource.includes('"arrow-scale": 1.1')
   ) {
-    persistenceFailures.push("renderer edge labels should be readable while keeping hook-style arrow scale");
+    persistenceFailures.push("renderer edge labels should be readable while keeping hook-style arrow scale (#21)");
   }
-  if (!rendererSource.includes('"text-background-opacity": 0.95') || !rendererSource.includes('"text-background-padding": "5px"')) {
-    persistenceFailures.push("renderer edge labels should keep a readable background halo");
+  if (!rendererSource.includes('"text-background-opacity": 0.92') || !rendererSource.includes('"text-background-padding": "4px"')) {
+    persistenceFailures.push("renderer edge labels should keep a readable background halo (#21)");
   }
   if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(rendererSource)) {
     persistenceFailures.push("renderer weak edge labels must not be faded by edge opacity");

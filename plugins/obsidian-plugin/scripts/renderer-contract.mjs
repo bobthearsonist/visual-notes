@@ -150,6 +150,9 @@ function evaluateRendererSourceContract(source) {
   if (!source.includes("minZoom: 0.1")) {
     contractFailures.push("renderer must allow narrow-pane fitting with minZoom 0.1");
   }
+  if (!source.includes("wheelSensitivity: 0.3")) {
+    contractFailures.push("renderer must keep wheelSensitivity 0.3 for smooth zoom (#21)");
+  }
 
   return contractFailures;
 }
