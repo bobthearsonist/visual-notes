@@ -72,31 +72,31 @@ Open questions:
 
 ### Layout strategy
 
-v0.1 uses LLM-provided `position: {x, y}` coordinates and Cytoscape's
-`preset` layout. This keeps the prompt in control of visual grouping, but it
-can produce overlaps or off-canvas nodes.
+**Resolved in #21:** the renderer trusts LLM-provided positions. The
+deterministic layout was retired in favor of a repair pass that fixes
+specific defects (missing coordinates, off-canvas positions,
+collisions <140x70) without reorganizing what isn't broken. This
+preserves the narrative semantics Claude already encodes (cluster
+columns + status tiers from the extraction prompt) without paying
+twice for layout logic in TypeScript.
 
-Future options:
+Background:
 
-1. **Keep LLM positions.**
-   - Pro: preserves explicit semantic clustering.
-   - Con: prompt quality directly affects readability.
-2. **Switch to Cytoscape layout such as `cose-bilkent`.**
-   - Pro: less prompt burden, likely fewer overlaps.
-   - Con: may lose deliberate "daily narrative" placement.
-3. **Hybrid approach.**
-   - LLM returns clusters and ranks; Cytoscape computes positions inside
-     cluster constraints.
-
-Decision for now: keep preset LLM positions, but A/B against a force-directed
-layout before a stable release.
-
-Design tasks:
-
-- Add a repeatable layout comparison fixture with the same sidecar rendered
-  under preset and force-directed strategies.
-- Decide whether `position` remains required in schema v1.
-- Define behavior for nodes outside schema coordinate bounds.
+- v0.1 used LLM positions with Cytoscape's `preset` layout, then
+  deterministically normalized them via component grid packing.
+- The grid normalization erased the narrative awareness Claude
+  produced (hub-at-top-center, status-tier Y banding, cluster
+  columns based on the day's threads), replacing it with a generic
+  topology grid.
+- #21 stops the normalization step. `applyDeterministicLayout` is
+  now a thin repair pipeline (assignMissing → clampOffCanvas →
+  resolveCollisions). `calculateLayoutMetrics` is kept exported for
+  potential future quality-gate work.
+- Pinned sidecars (`_pinned: true`) remain authoritative and skip
+  the repair pass entirely.
+- Existing on-disk sidecars retain their previously-grid'd positions
+  until they're force-regenerated. A future retroactive re-layout
+  migration is captured as a follow-up issue.
 
 ### Marketplace and release planning
 
@@ -266,11 +266,35 @@ Open areas:
 | Topic | Current leaning | Decision needed before |
 |---|---|---|
 | Section-aware extraction patches | Use sidecar section metadata; keep full-note fallback | schema v1 |
-| Layout algorithm | Keep preset positions; A/B force-directed | stable release |
+| Layout algorithm | ✅ Trust LLM positions + repair pass (decided in #21) | — |
 | API key storage | Improve desktop storage; document mobile caveat | public beta |
 | Cost dashboard | Keep status count for MVP | after beta feedback |
 | Claude Code pin defaults | Do not pin automatically | companion migration |
 | Rollup/session sidecar rendering | Preserve schema values, skip in v0.1 renderer | adding those modes |
+
+### Legacy hook artifacts vs. plugin renderer
+
+Several work-vault folders (notably `0 Profisee/...`) contain static
+`*-overview.html` and `whiteboard.html` files alongside their
+`*-overview.json` sidecars. These HTMLs were produced by a prior
+agent-curated workflow:
+
+1. An agent/skill authored a sidecar JSON with curated nodes,
+   edges, classes, and positions.
+2. A PostToolUse hook ran `~/ai/skills/visual-notes/scripts/regenerate.py`,
+   which spliced the sidecar into a cached
+   `cytoscape-template.html` and wrote a sibling HTML.
+3. The daily note linked the HTML via iframe.
+
+This path is not the future direction. The Obsidian plugin renders
+sidecars inline from the same JSON contract, eliminating the
+static HTML middle-step and removing the dependency on agent
+curation for daily notes. The historical HTMLs remain on disk as
+reference artifacts but are not regenerated.
+
+If you're touching anything in `~/ai/skills/visual-notes/scripts/`,
+you're working on the legacy path. If you're touching
+`plugins/obsidian-plugin/src/`, you're working on the future path.
 
 ## Reference links
 
