@@ -93,10 +93,12 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
     return sidecar;
   }
 
-  return {
-    ...sidecar,
-    nodes: layoutNodes(sidecar.nodes, sidecar.edges),
-  };
+  return { ...sidecar, nodes: repairNodes(sidecar.nodes) };
+}
+
+function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
+  // Repair pipeline grows in later tasks. For now, pass through.
+  return nodes;
 }
 
 export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetrics {
