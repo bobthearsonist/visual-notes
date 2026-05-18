@@ -62,4 +62,33 @@ describe("applyDeterministicLayout — repair pass", () => {
     assert.equal(byId.get("low")!.y, 3000, "low clamped to max y");
     assert.deepEqual(byId.get("inside"), { x: 200, y: 200 }, "inside untouched");
   });
+
+  it("separates two nodes placed at the same position", () => {
+    const sidecar = makeSidecar([
+      { id: "a", classes: "system context", position: { x: 300, y: 300 } },
+      { id: "b", classes: "system context", position: { x: 300, y: 300 } },
+    ]);
+
+    const result = applyDeterministicLayout(sidecar);
+    const positions = result.nodes.map((n) => n.position);
+    const dx = Math.abs(positions[0].x - positions[1].x);
+    const dy = Math.abs(positions[0].y - positions[1].y);
+
+    // After repair, nodes must clear the collision envelope of 140x70.
+    assert.ok(
+      dx >= 140 || dy >= 70,
+      `expected separation >= collision radii but got dx=${dx}, dy=${dy}`,
+    );
+  });
+
+  it("preserves first node when separating a colliding pair", () => {
+    const sidecar = makeSidecar([
+      { id: "anchor", classes: "system context", position: { x: 500, y: 400 } },
+      { id: "dupe",   classes: "system context", position: { x: 510, y: 405 } },
+    ]);
+
+    const result = applyDeterministicLayout(sidecar);
+    const anchor = result.nodes.find((n) => n.data.id === "anchor")!;
+    assert.deepEqual(anchor.position, { x: 500, y: 400 }, "anchor untouched");
+  });
 });

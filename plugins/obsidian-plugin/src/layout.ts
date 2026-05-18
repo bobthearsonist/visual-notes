@@ -14,8 +14,8 @@ const READABLE_CARD_WIDTH = 1120;
 const READABLE_CARD_HEIGHT = 520;
 const FIT_PADDING_X = 100;
 const FIT_PADDING_Y = 100;
-const COLLISION_RADIUS_X = 120;
-const COLLISION_RADIUS_Y = 95;
+const COLLISION_RADIUS_X = 140;
+const COLLISION_RADIUS_Y = 70;
 const NODE_FONT_SIZE = 13;
 const VISIBLE_MIN_X = 20;
 const VISIBLE_MIN_Y = 40;
@@ -101,7 +101,7 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
 }
 
 function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
-  return clampOffCanvas(nodes);
+  return resolveCollisions(clampOffCanvas(nodes));
 }
 
 function clampOffCanvas(nodes: VisualNotesNode[]): VisualNotesNode[] {
@@ -113,6 +113,70 @@ function clampOffCanvas(nodes: VisualNotesNode[]): VisualNotesNode[] {
     }
     return { ...node, position: { x, y } };
   });
+}
+
+function resolveCollisions(nodes: VisualNotesNode[]): VisualNotesNode[] {
+  const repaired: VisualNotesNode[] = [];
+
+  for (const node of nodes) {
+    let position = { ...node.position };
+
+    let attempts = 0;
+    while (attempts < 12 && hasCollision(position, repaired)) {
+      position = nudgeAway(position, repaired);
+      // Clamp after each nudge so we don't push off-canvas.
+      position = {
+        x: clamp(position.x, SCHEMA_MIN_X, SCHEMA_MAX_X),
+        y: clamp(position.y, SCHEMA_MIN_Y, SCHEMA_MAX_Y),
+      };
+      attempts += 1;
+    }
+
+    repaired.push(
+      position.x === node.position.x && position.y === node.position.y
+        ? node
+        : { ...node, position },
+    );
+  }
+
+  return repaired;
+}
+
+function hasCollision(
+  position: { x: number; y: number },
+  placed: VisualNotesNode[],
+): boolean {
+  return placed.some(
+    (other) =>
+      Math.abs(other.position.x - position.x) < COLLISION_RADIUS_X &&
+      Math.abs(other.position.y - position.y) < COLLISION_RADIUS_Y,
+  );
+}
+
+function nudgeAway(
+  position: { x: number; y: number },
+  placed: VisualNotesNode[],
+): { x: number; y: number } {
+  // Push along the dominant gap direction so we exit the envelope in one step.
+  const colliding = placed.find(
+    (other) =>
+      Math.abs(other.position.x - position.x) < COLLISION_RADIUS_X &&
+      Math.abs(other.position.y - position.y) < COLLISION_RADIUS_Y,
+  );
+  if (!colliding) {
+    return position;
+  }
+
+  const dx = position.x - colliding.position.x;
+  const dy = position.y - colliding.position.y;
+
+  // Pick the axis with more available room to push along.
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const sign = dx >= 0 ? 1 : -1;
+    return { x: colliding.position.x + sign * COLLISION_RADIUS_X, y: position.y };
+  }
+  const sign = dy >= 0 ? 1 : -1;
+  return { x: position.x, y: colliding.position.y + sign * COLLISION_RADIUS_Y };
 }
 
 export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetrics {
