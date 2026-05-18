@@ -21,6 +21,10 @@ const VISIBLE_MIN_X = 20;
 const VISIBLE_MIN_Y = 40;
 const MAX_X = 5000;
 const MAX_Y = 3000;
+const SCHEMA_MIN_X = -200;
+const SCHEMA_MAX_X = 5000;
+const SCHEMA_MIN_Y = -200;
+const SCHEMA_MAX_Y = 3000;
 
 type NodeType = "system" | "task" | "decision";
 type NodeStatus = "completed" | "active" | "context" | "blocked";
@@ -97,8 +101,18 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
 }
 
 function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
-  // Repair pipeline grows in later tasks. For now, pass through.
-  return nodes;
+  return clampOffCanvas(nodes);
+}
+
+function clampOffCanvas(nodes: VisualNotesNode[]): VisualNotesNode[] {
+  return nodes.map((node) => {
+    const x = clamp(node.position.x, SCHEMA_MIN_X, SCHEMA_MAX_X);
+    const y = clamp(node.position.y, SCHEMA_MIN_Y, SCHEMA_MAX_Y);
+    if (x === node.position.x && y === node.position.y) {
+      return node;
+    }
+    return { ...node, position: { x, y } };
+  });
 }
 
 export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetrics {
