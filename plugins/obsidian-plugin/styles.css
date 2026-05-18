@@ -4,11 +4,23 @@
   margin: 0 0 1rem;
   overflow: hidden;
   background: var(--background-primary);
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .markdown-source-view > .visual-notes-source-container {
   flex: 0 0 auto;
   margin: 0 var(--file-margins) 1rem;
+  width: calc(100% - (2 * var(--file-margins)));
+}
+
+.visual-notes-codeblock-container {
+  margin: 1rem 0;
+}
+
+.visual-notes-codeblock-host {
+  display: block;
+  white-space: normal;
 }
 
 .visual-notes-header {

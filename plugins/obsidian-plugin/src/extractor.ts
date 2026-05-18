@@ -2,13 +2,18 @@ import { requestUrl } from "obsidian";
 import { z } from "zod";
 import EXTRACT_GRAPH_PROMPT from "../prompts/extract-graph.md";
 import sharedSidecarSchema from "../../../shared/schema.json";
+import {
+  classifyAnthropicFailure,
+  retryAfterSeconds,
+  type AnthropicFailureKind,
+} from "./anthropic";
 import { sidecarSchema, type VisualNotesSidecar } from "./schema";
 import type { MarkdownSectionSummary } from "./sections";
 import { createExtractionUsage, type ExtractionUsage } from "./usage";
 
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const MAX_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = 8192;
 const MAX_VALIDATION_ATTEMPTS = 2;
 
 const anthropicMessagesResponseSchema = z
@@ -68,6 +73,8 @@ export class AnthropicExtractionError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    readonly failureKind: AnthropicFailureKind = classifyAnthropicFailure(status),
+    readonly retryAfter?: number,
   ) {
     super(message);
     this.name = "AnthropicExtractionError";
@@ -132,9 +139,12 @@ export async function extractGraphFromAnthropic(
     });
 
     if (response.status !== 200) {
+      const apiError = parseAnthropicError(response.text);
       throw new AnthropicExtractionError(
-        `Anthropic API returned HTTP ${response.status}: ${formatAnthropicError(response.text)}`,
+        `Anthropic API returned HTTP ${response.status}: ${formatAnthropicError(apiError)}`,
         response.status,
+        classifyAnthropicFailure(response.status, apiError),
+        retryAfterSeconds(response.headers),
       );
     }
 
@@ -142,6 +152,8 @@ export async function extractGraphFromAnthropic(
     if (parsedResponse.stop_reason === "max_tokens") {
       throw new AnthropicExtractionError(
         `Anthropic response hit the ${MAX_OUTPUT_TOKENS} token limit before producing a complete graph.`,
+        undefined,
+        "output-too-large",
       );
     }
 
@@ -262,15 +274,27 @@ function summarizeContentTypes(content: unknown[]): string {
   return types.length > 0 ? types.join(", ") : "none";
 }
 
-function formatAnthropicError(text: string): string {
+function parseAnthropicError(text: string): { type?: string; message?: string; raw: string } {
   const value = tryParseJson(text);
   const parsed = anthropicToolResponseSchema.safeParse(value);
-  if (parsed.success && parsed.data.error?.message) {
-    const type = parsed.data.error.type ? `${parsed.data.error.type}: ` : "";
-    return `${type}${parsed.data.error.message}`;
+  if (parsed.success && parsed.data.error) {
+    return {
+      type: parsed.data.error.type,
+      message: parsed.data.error.message,
+      raw: text,
+    };
   }
 
-  return truncate(text);
+  return { raw: text };
+}
+
+function formatAnthropicError(error: { type?: string; message?: string; raw: string }): string {
+  if (error.message) {
+    const type = error.type ? `${error.type}: ` : "";
+    return `${type}${error.message}`;
+  }
+
+  return truncate(error.raw);
 }
 
 function formatZodError(error: z.ZodError): string {

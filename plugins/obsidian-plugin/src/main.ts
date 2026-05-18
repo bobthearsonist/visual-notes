@@ -6,6 +6,7 @@ import {
   Plugin,
   TFile,
   normalizePath,
+  type MarkdownPostProcessorContext,
 } from "obsidian";
 import {
   buildDailyContextExtractionInput,
@@ -14,6 +15,7 @@ import {
   normalizeDailyContextDateFromPath,
   type PreparedDailyContextExtraction,
 } from "./daily-context";
+import { validateAnthropicApiKey } from "./anthropic";
 import { AnthropicExtractionError, extractGraphFromAnthropic } from "./extractor";
 import { estimateTokens, hashMarkdownSections, semanticMarkdownHash, sha256Hash } from "./hash";
 import { applyDeterministicLayout } from "./layout";
@@ -44,11 +46,12 @@ const MOUNT_RETRY_LIMIT = 30;
 const MOUNT_RETRY_DELAY_MS = 100;
 
 type VisualNotesViewMode = "preview" | "source";
+type ExtractionSourceMode = "auto" | "daily-context";
 
 interface ExtractionOptions {
   force: boolean;
   manual: boolean;
-  sourceMode?: "auto" | "daily-context";
+  sourceMode?: ExtractionSourceMode;
 }
 
 interface PreparedExtractionInput {
@@ -88,8 +91,27 @@ export default class VisualNotesPlugin extends Plugin {
 
     await this.noticeMissingWatchedFolders();
     this.registerCommands();
+    this.registerMarkdownCodeBlockProcessor("visual-notes", (_source, el, ctx) => {
+      this.mountVisualNotesCodeBlock(el, ctx);
+    });
     this.registerMarkdownPostProcessor((el, ctx) => {
       if (!ctx.sourcePath.endsWith(".md")) {
+        return;
+      }
+
+      const renderedBlocks = Array.from(el.querySelectorAll(".block-language-visual-notes")).filter(
+        (block): block is HTMLElement => block instanceof HTMLElement,
+      );
+      const visualBlocks =
+        renderedBlocks.length > 0
+          ? renderedBlocks
+          : Array.from(
+              el.querySelectorAll(".cm-lang-visual-notes, pre > code.language-visual-notes, code.language-visual-notes"),
+            ).filter((block): block is HTMLElement => block instanceof HTMLElement);
+      if (visualBlocks.length > 0) {
+        visualBlocks.forEach((block) => {
+          this.mountVisualNotesCodeBlock(block, ctx);
+        });
         return;
       }
 
@@ -134,6 +156,34 @@ export default class VisualNotesPlugin extends Plugin {
     this.registerInterval(window.setInterval(() => this.queueActiveVisualNotesMount(), 1_000));
 
     window.setTimeout(() => this.queueActiveVisualNotesMount(), 0);
+  }
+
+  private mountVisualNotesCodeBlock(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+    if (!ctx.sourcePath.endsWith(".md")) {
+      return;
+    }
+
+    const existingContainer = el.querySelector(".visual-notes-codeblock-container");
+    if (existingContainer instanceof HTMLElement) {
+      return;
+    }
+
+    try {
+      el.replaceChildren();
+      el.classList.add("visual-notes-codeblock-host");
+      const container = document.createElement("div");
+      container.className = "visual-notes-container visual-notes-codeblock-container";
+      container.dataset.visualNotesSourcePath = ctx.sourcePath;
+      el.appendChild(container);
+      ctx.addChild(
+        new VisualNotesRenderChild(container, this, ctx.sourcePath, {
+          removeContainerOnUnload: false,
+          removeDuplicates: false,
+        }),
+      );
+    } catch (error) {
+      this.log("error", "Failed to mount visual-notes code block.", { sourcePath: ctx.sourcePath, error });
+    }
   }
 
   onunload(): void {
@@ -248,11 +298,16 @@ export default class VisualNotesPlugin extends Plugin {
     this.pendingMountSourcePaths.add(sourcePath);
     window.setTimeout(() => {
       this.pendingMountSourcePaths.delete(sourcePath);
-      this.mountVisualNotesForSource(sourcePath);
+      void this.mountVisualNotesForSource(sourcePath);
     }, 0);
   }
 
-  private mountVisualNotesForSource(sourcePath: string, attempt = 0): void {
+  private async mountVisualNotesForSource(sourcePath: string, attempt = 0): Promise<void> {
+    if (await this.sourceHasExplicitVisualNotesBlock(sourcePath)) {
+      this.clearActiveRenderChild();
+      return;
+    }
+
     const activeFile = this.app.workspace.getActiveFile();
     if (!(activeFile instanceof TFile) || activeFile.path !== sourcePath) {
       return;
@@ -269,7 +324,7 @@ export default class VisualNotesPlugin extends Plugin {
     if (!(mountTarget instanceof HTMLElement)) {
       if (attempt < MOUNT_RETRY_LIMIT) {
         window.setTimeout(
-          () => this.mountVisualNotesForSource(sourcePath, attempt + 1),
+          () => void this.mountVisualNotesForSource(sourcePath, attempt + 1),
           MOUNT_RETRY_DELAY_MS,
         );
       }
@@ -282,6 +337,11 @@ export default class VisualNotesPlugin extends Plugin {
       this.activeRenderMode === mode &&
       this.activeRenderChild.containerEl.parentElement === mountTarget
     ) {
+      return;
+    }
+
+    if (mode === "preview" && this.hasCodeblockContainerForSource(sourcePath)) {
+      this.clearActiveRenderChild();
       return;
     }
 
@@ -333,6 +393,24 @@ export default class VisualNotesPlugin extends Plugin {
     this.activeRenderChild = null;
     this.activeRenderSourcePath = null;
     this.activeRenderMode = null;
+  }
+
+  private hasCodeblockContainerForSource(sourcePath: string): boolean {
+    return (
+      document.querySelector(
+        `.visual-notes-codeblock-container[data-visual-notes-source-path="${cssEscape(sourcePath)}"]`,
+      ) !== null
+    );
+  }
+
+  private async sourceHasExplicitVisualNotesBlock(sourcePath: string): Promise<boolean> {
+    const file = this.app.vault.getAbstractFileByPath(sourcePath);
+    if (!(file instanceof TFile)) {
+      return false;
+    }
+
+    const markdown = await this.app.vault.read(file);
+    return /```visual-notes(?:\s|$)/u.test(markdown);
   }
 
   private withActiveMarkdownFile(
@@ -403,8 +481,9 @@ export default class VisualNotesPlugin extends Plugin {
   }
 
   private async extractFile(file: TFile, options: ExtractionOptions): Promise<void> {
-    if (!this.settings.anthropicApiKey) {
-      new Notice("Visual Notes: add your Anthropic API key in Settings.");
+    const apiKeyProblem = validateAnthropicApiKey(this.settings.anthropicApiKey);
+    if (apiKeyProblem) {
+      new Notice(`Visual Notes: ${apiKeyProblem}`, 8000);
       this.updateStatusBar();
       return;
     }
@@ -548,7 +627,8 @@ export default class VisualNotesPlugin extends Plugin {
     options: ExtractionOptions,
   ): Promise<PreparedExtractionInput | null> {
     const rawHash = await sha256Hash(rawMarkdown);
-    const dailyContext = await this.prepareDailyContextExtraction(file, options.sourceMode ?? "auto");
+    const sourceMode = options.sourceMode ?? "auto";
+    const dailyContext = await this.prepareDailyContextExtraction(file, sourceMode);
     if (dailyContext) {
       return {
         ...dailyContext,
@@ -556,7 +636,7 @@ export default class VisualNotesPlugin extends Plugin {
       };
     }
 
-    if (options.sourceMode === "daily-context") {
+    if (sourceMode === "daily-context") {
       return null;
     }
 
@@ -728,6 +808,12 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
+    if (validateAnthropicApiKey(this.settings.anthropicApiKey)) {
+      this.statusBarEl.setText("Visual Notes: check API key");
+      this.statusBarEl.toggleClass("mod-error", true);
+      return;
+    }
+
     if (this.settings.watchedFolders.length === 0) {
       this.statusBarEl.setText("Visual Notes: add watched folder");
       this.statusBarEl.toggleClass("mod-error", true);
@@ -746,14 +832,39 @@ export default class VisualNotesPlugin extends Plugin {
 
   private handleExtractionError(error: unknown): void {
     if (error instanceof AnthropicExtractionError) {
-      this.log("error", error.message, { status: error.status });
-      if (error.status === 401) {
-        new Notice("Visual Notes: API key invalid. Open Settings -> Visual Notes.", 8000);
-        return;
+      this.log("error", error.message, {
+        status: error.status,
+        failureKind: error.failureKind,
+        retryAfter: error.retryAfter,
+      });
+      switch (error.failureKind) {
+        case "authentication":
+          new Notice("Visual Notes: API key invalid. Open Settings -> Visual Notes.", 8000);
+          return;
+        case "rate-limit": {
+          const retryText = error.retryAfter ? ` Try again in ~${error.retryAfter}s.` : "";
+          new Notice(`Visual Notes: Anthropic rate limit hit.${retryText}`, 8000);
+          return;
+        }
+        case "usage-limit":
+          new Notice("Visual Notes: Anthropic API usage limit reached. Check billing/limits.", 8000);
+          return;
+        case "input-too-large":
+          new Notice("Visual Notes: extraction input is too large. Narrow Daily Context or split the note.", 8000);
+          return;
+        case "output-too-large":
+          new Notice("Visual Notes: graph response hit the output token limit. Split the note or reduce scope.", 8000);
+          return;
+        case "bad-request":
+          new Notice("Visual Notes: Anthropic rejected the request. Check model/settings; see console.", 8000);
+          return;
+        case "server":
+          new Notice("Visual Notes: Anthropic service error. Try again later.", 8000);
+          return;
+        case "unknown":
+          new Notice(`Visual Notes: extraction failed (${error.status ?? "network"}). See console.`);
+          return;
       }
-
-      new Notice(`Visual Notes: extraction failed (${error.status ?? "network"}). See console.`);
-      return;
     }
 
     this.log("error", "Extraction failed.", error);
