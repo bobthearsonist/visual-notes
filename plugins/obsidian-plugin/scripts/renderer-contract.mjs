@@ -117,12 +117,13 @@ function evaluateRendererSourceContract(source) {
     contractFailures.push("renderer must keep MVP bezier edges");
   }
   if (
-    !source.includes('"font-size": 13') ||
-    !source.includes('"font-weight": 600') ||
-    !source.includes("width: 118") ||
-    !source.includes("height: 54")
+    !source.includes('"font-size": 11') ||
+    !source.includes('"font-weight": 500')
   ) {
-    contractFailures.push("renderer must keep readable compact paint-safe 13px nodes");
+    contractFailures.push("renderer must keep readable compact 11px/500-weight nodes (#21)");
+  }
+  if (!source.includes('width: "label"') || !source.includes('height: "label"')) {
+    contractFailures.push("nodes must be label-sized (width/height: 'label') (#21)");
   }
   if (
     !source.includes('"font-size": 14') ||
