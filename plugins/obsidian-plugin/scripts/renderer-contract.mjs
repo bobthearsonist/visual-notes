@@ -126,14 +126,14 @@ function evaluateRendererSourceContract(source) {
     contractFailures.push("nodes must be label-sized (width/height: 'label') (#21)");
   }
   if (
-    !source.includes('"font-size": 14') ||
-    !source.includes('"font-weight": 700') ||
-    !source.includes('"arrow-scale": 0.8')
+    !source.includes('"font-size": 11') ||
+    !source.includes('"font-weight": "normal"') ||
+    !source.includes('"arrow-scale": 1.1')
   ) {
-    contractFailures.push("renderer must keep readable 14px relationship labels and arrow scale");
+    contractFailures.push("renderer must keep 11px normal-weight edge labels and 1.1 arrow scale (#21)");
   }
-  if (!source.includes('"text-background-opacity": 0.95') || !source.includes('"text-background-padding": "5px"')) {
-    contractFailures.push("edge labels must keep a readable background halo");
+  if (!source.includes('"text-background-opacity": 0.92') || !source.includes('"text-background-padding": "4px"')) {
+    contractFailures.push("edge labels must keep a 92% opacity halo with 4px padding (#21)");
   }
   if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(source)) {
     contractFailures.push("weak edge labels must not be faded by edge opacity");
