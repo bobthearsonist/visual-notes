@@ -121,4 +121,19 @@ describe("applyDeterministicLayout — repair pass", () => {
       "ghost was assigned a non-zero position",
     );
   });
+
+  it("returns pinned sidecars unchanged even when positions look broken", () => {
+    const pinned = {
+      ...makeSidecar([
+        { id: "off-canvas", classes: "system context", position: { x: -9999, y: 9999 } },
+        { id: "collider-a", classes: "system context", position: { x: 100, y: 100 } },
+        { id: "collider-b", classes: "system context", position: { x: 100, y: 100 } },
+      ]),
+      _pinned: true,
+    } as VisualNotesSidecar;
+
+    const result = applyDeterministicLayout(pinned);
+
+    assert.equal(result, pinned, "pinned sidecar returned by identity");
+  });
 });
