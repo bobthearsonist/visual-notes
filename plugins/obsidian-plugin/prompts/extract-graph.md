@@ -50,10 +50,10 @@ The most-connected nodes are the day's central themes. Peripheral nodes
 get one or two edges. If everything has the same fan-out, you flattened
 the structure — re-read for the actual hub.
 
-### 3. Max 30 nodes — MUST cluster past that
+### 3. Prefer 8–18 nodes; max 30 nodes — MUST cluster past that
 
-Past ~30 nodes the visual becomes unreadable; past 50 the schema
-rejects it. **Cluster aggressively:**
+For ordinary notes, prefer 8–18 nodes. Past ~30 nodes the visual becomes
+unreadable; past 50 the schema rejects it. **Cluster aggressively:**
 
 - If any single section has ≥10 distinct items, group them into ONE
   cluster node, don't enumerate.

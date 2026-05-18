@@ -1,6 +1,6 @@
 ---
 name: visual-notes
-description: Concept-map visualization for daily notes. Documents the sidecar JSON schema and design heuristics so agents can pre-populate the visual when appending session summaries. The companion Obsidian plugin handles automatic extraction; this skill is for agent-driven pre-population only.
+description: Concept-map sidecar schema and heuristics for optional agent-curated Visual Notes graphs. The normal path is Obsidian plugin automatic extraction from watched markdown; this skill is for future pinned/curated sidecar workflows only.
 ---
 
 # Visual Notes (Claude Code skill)
@@ -11,22 +11,24 @@ description: Concept-map visualization for daily notes. Documents the sidecar JS
 
 ## What this skill is for
 
-When an AI agent is writing detailed session summaries to a daily note, the
-agent can also write a sidecar JSON describing the day's concepts as a
-graph. The Obsidian plugin renders that sidecar as a Cytoscape concept map
-inline in the daily note view.
+When an AI agent intentionally curates a graph, it can write a sidecar JSON
+describing a note's concepts as a graph. The Obsidian plugin renders that
+sidecar as a Cytoscape concept map inline in the note view.
+
+This is not the normal session-summary trigger. Session summaries should be
+created by the `obsidian-notes` skill using the AI session summary template,
+then extracted/rendered by the Obsidian Visual Notes plugin.
 
 The sidecar schema is defined in [`shared/schema.json`](../../../../shared/schema.json).
 
 ## Workflow (post-migration)
 
-1. After appending a session summary, read the daily note in full
+1. Read the target markdown note
 2. Design a graph: nodes for major concepts, edges for relationships
 3. Apply the design heuristics (see references)
-4. Write the sidecar JSON next to the daily note as
-   `{date}-overview.json`
-5. The Obsidian plugin's file watcher will pick up the change and render
-   the visual
+4. Write the sidecar JSON next to the note as `{note-basename}-overview.json`
+5. Set `_pinned: true` only when the agent is deliberately claiming ownership
+6. The Obsidian plugin renders the visual from the sidecar
 
 ## Heuristics (summary)
 

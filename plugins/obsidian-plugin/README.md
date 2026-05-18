@@ -1,9 +1,9 @@
 # Visual Notes — Obsidian plugin
 
-The primary artifact of the [Visual Notes](../..) project. Watches daily
-notes in a configured folder, calls the Claude API to extract a concept-map
-graph from the markdown, applies a deterministic layout pass, and renders an
-interactive Cytoscape visual at the top of the rendered note view.
+The primary artifact of the [Visual Notes](../..) project. Watches configured
+markdown folders, calls the Claude API to extract a concept-map graph, applies a
+deterministic layout pass, writes a sibling JSON sidecar, and renders an
+interactive Cytoscape visual in Obsidian.
 
 ## Status
 
@@ -67,7 +67,7 @@ After install, open Settings → Visual Notes:
 | Setting | What it does |
 |---|---|
 | **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in plaintext `data.json` for this first pass. |
-| **Watched folders** | A list of folders containing daily notes. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add multiple folders if you keep separate work/personal/project journals (e.g., `Captains Log`, `0 Daily ADHD Brain Logs`, `Projects/visual-notes/Journal`). Each folder produces its own sidecars in-place; same model, same prompt, same schema across all watched folders. |
+| **Watched folders** | A list of folders containing notes to visualize. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add daily folders and AI session folders as needed (e.g., `0 Daily ADHD Brain Logs`, `0 Profisee/Captains Log`, `0 AI Sessions`, `0 Profisee/AI Sessions`). Each folder produces sidecars in-place; same model, same prompt, same schema across all watched folders. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |
 | **Use Daily Context** | When the `daily-context` plugin is available, extract from structured daily sources instead of raw note markdown. |
@@ -79,6 +79,8 @@ wait for the prompt-override field in a later release.
 
 ## How it works
 
+The plugin is standalone: it can extract from any watched markdown note.
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -86,15 +88,31 @@ sequenceDiagram
     participant Plugin
     participant API as Claude API
 
-    User->>Obsidian: save daily note
+    User->>Obsidian: save or manually extract a watched note
     Obsidian->>Plugin: vault.on('modify')
+    Plugin->>Plugin: choose raw note or Daily Context source
     Plugin->>Plugin: debounce + hash check
     Plugin->>API: requestUrl /v1/messages
     API-->>Plugin: structured JSON (Zod-validated)
-    Plugin->>Obsidian: write {date}-overview.json
+    Plugin->>Obsidian: write {note-basename}-overview.json
     Obsidian->>Plugin: trigger MarkdownPostProcessor
-    Plugin->>User: render Cytoscape inline
+    Plugin->>User: render Cytoscape inline or in visual-notes block
 ```
+
+Daily Context auto-mode applies only to date-named daily notes such as
+`20260517.md` or `2026-05-17.md`. Other watched markdown files use raw-note
+extraction by default, even if their path contains a date. That keeps optional
+workflows such as AI session summaries from accidentally ingesting every source
+attached to the same day.
+
+To reserve a stable visual location in any note or template, add:
+
+````markdown
+## Session Visual
+
+```visual-notes
+```
+````
 
 See the architecture overview in [`../../README.md`](../../README.md) and the
 future-facing notes in [`../../docs/design.md`](../../docs/design.md).
@@ -134,9 +152,14 @@ redacted metadata and never commits prompts, source text, or generated graphs.
 ## Sources of content
 
 By default, the plugin extracts from the active note. When Daily Context is
-enabled and available, it extracts from that provider's structured source list
-instead. The explicit **Extract from current note using Daily Context** command
-requires the provider and does not fall back to raw markdown.
+enabled and available for a date-like daily note, it extracts from that
+provider's structured source list instead. The explicit **Extract from current
+note using Daily Context** command requires the provider and does not fall back
+to raw markdown.
+
+Date-named daily notes can use Daily Context in automatic mode. Other watched
+notes use raw-note mode unless the user explicitly runs the Daily Context
+command on a compatible date-named note.
 
 Raw-note mode sees **everything** in the daily note:
 - AI session summaries written by Claude Code, OpenCode, Copilot, etc.
