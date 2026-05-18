@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — PROPOSED plugin style (today's note 2026-05-18)</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --bg-secondary: #181825;
+    --text: #cdd6f4;
+    --text-muted: #a6adc8;
+    --text-faint: #6c7086;
+    --border: #45475a;
+    --interactive-accent: #89b4fa;
+    --completed-bg: #a6e3a1; --completed: #40a02b;
+    --active-bg: #f9e2af; --active: #df8e1d;
+    --context-bg: #89b4fa; --context: #1e66f5;
+    --blocked-bg: #f38ba8; --blocked: #d20f39;
+    --edge: #8c8fa1;
+    --edge-strong: #cdd6f4;
+    --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 1rem; }
+  .preview-label { font-size: 12px; color: var(--text-muted); margin-bottom: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+  .preview-label strong { color: var(--text); }
+  .preview-label .tag { display: inline-block; padding: 1px 6px; background: #a6e3a1; color: #1e1e2e; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; }
+  .vn-container { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); }
+  .vn-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 0.75rem 1rem 0.5rem; }
+  .vn-heading { flex: 1 1 auto; }
+  .vn-title { font-weight: 700; color: var(--text); }
+  .vn-subtitle { color: var(--text-muted); font-size: 12px; margin-top: 0.25rem; }
+  .vn-legend { display: flex; flex: 0 1 34rem; flex-direction: column; gap: 0.3rem; align-items: flex-end; color: var(--text-muted); font-size: 11px; text-align: right; }
+  .vn-legend-group { display: flex; flex-wrap: wrap; gap: 0.25rem 0.35rem; align-items: center; justify-content: flex-end; }
+  .vn-legend-label { color: var(--text-faint); font-weight: 600; text-transform: uppercase; margin-right: 0.1rem; }
+  .vn-legend-item { display: inline-flex; gap: 0.25rem; align-items: center; white-space: nowrap; }
+  .vn-legend-swatch { width: 0.75rem; height: 0.75rem; border: 1px solid var(--border); background: var(--bg-secondary); }
+  .vn-legend-status-completed { background: #a6e3a1; border-color: #40a02b; }
+  .vn-legend-status-active    { background: #f9e2af; border-color: #df8e1d; }
+  .vn-legend-status-context   { background: #89b4fa; border-color: #1e66f5; }
+  .vn-legend-status-blocked   { background: #f38ba8; border-color: #d20f39; }
+  .vn-legend-type-system  { border-radius: 0.2rem; }
+  .vn-legend-type-task    { border-radius: 999px; }
+  .vn-legend-type-decision{ width: 0.6rem; height: 0.6rem; margin: 0 0.075rem; transform: rotate(45deg); }
+  .vn-legend-edge-strong, .vn-legend-edge-weak { width: 1.2rem; height: 0; border: 0; border-top: 2px solid var(--text-muted); background: transparent; }
+  .vn-legend-edge-strong { border-top-width: 3px; border-top-color: var(--text); }
+  .vn-legend-edge-weak   { border-top-style: dashed; }
+  #cy { height: 70vh; min-height: 560px; width: 100%; }
+  .vn-source { border-top: 1px solid var(--border); padding: 0.5rem 1rem 0.65rem; color: var(--text-muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="preview-label"><span class="tag">PROPOSED</span> <strong>Plugin renderer after issue #21</strong> · today's note (2026-05-18) · positions hand-authored following <code>extract-graph.md</code> cluster-column + status-tier heuristics (simulates a trust-LLM extraction) · styling per §2 of design</div>
+<div class="vn-container">
+  <div class="vn-header">
+    <div class="vn-heading">
+      <div class="vn-title">Daily Overview</div>
+      <div class="vn-subtitle">Claude/Copilot statusline + settings sync + MCP gateway hardening</div>
+    </div>
+    <div class="vn-legend">
+      <div class="vn-legend-group"><div class="vn-legend-label">Status</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-completed"></div>done</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-active"></div>active</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-context"></div>context</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-blocked"></div>blocked</div></div>
+      <div class="vn-legend-group"><div class="vn-legend-label">Type</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-system"></div>system</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-task"></div>task</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-decision"></div>decision</div></div>
+      <div class="vn-legend-group"><div class="vn-legend-label">Edge</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-edge-strong"></div>strong</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-edge-weak"></div>weak</div></div>
+    </div>
+  </div>
+  <div id="cy"></div>
+  <div class="vn-source">Source: Daily Context (7 sources) · proposed plugin renderer (post-#21) · hover any node to highlight its connected edges</div>
+</div>
+<script>
+// PROPOSED: hand-authored positions following extract-graph.md
+// 4 cluster columns L→R: Settings Sync → MCP Gateway → Copilot Statusline → Claude Statusline Overhaul
+// Status tiers: top 80-200 (hubs/decisions), middle 240-440 (systems/tasks), bottom 480-620 (context/TODO)
+const SIDECAR = {
+  "nodes": [
+    // Cluster 1: Settings Sync (col x ≈ 60-220)
+    {"data":{"id":"claude-settings-sync","label":"Claude settings\nsync chain"},"classes":"task completed","position":{"x":140,"y":120}},
+    {"data":{"id":"local-yaml-chained-symlinks","label":"local.yaml:\nclaude symlink +\nchained settings.json"},"classes":"system completed","position":{"x":140,"y":280}},
+    {"data":{"id":"sync-sh-symlinks","label":"sync.sh chained\nsymlinks"},"classes":"system completed","position":{"x":60,"y":420}},
+    {"data":{"id":"ai-client-config-docs","label":"ai-client-config\nSKILL.md"},"classes":"task completed","position":{"x":220,"y":560}},
+
+    // Cluster 2: MCP Gateway (col x ≈ 380-560)
+    {"data":{"id":"mcpx-permissions-gate","label":"mcpx permissions\ngate (16 → 136\ntools)"},"classes":"decision completed","position":{"x":420,"y":100}},
+    {"data":{"id":"agentgateway-dns-cascade","label":"agentgateway\nDNS cascade\n(4 layers)"},"classes":"decision completed","position":{"x":580,"y":160}},
+    {"data":{"id":"rfc-1035-underscores","label":"RFC 1035:\nagentgateway rejects\nunderscores"},"classes":"decision context","position":{"x":580,"y":300}},
+    {"data":{"id":"gateway-readmes","label":"gateway readmes\nrewrite (shared\nlayout)"},"classes":"task completed","position":{"x":420,"y":420}},
+    {"data":{"id":"per-machine-config","label":"per-machine\nconfig override TODO\n(mcpx, agentgateway)"},"classes":"task active","position":{"x":420,"y":580}},
+
+    // Cluster 3: Copilot Statusline (col x ≈ 740-900)
+    {"data":{"id":"copilot-statusline","label":"Copilot CLI\nstatusline"},"classes":"task completed","position":{"x":820,"y":100}},
+    {"data":{"id":"copilot-context-tokens","label":"Copilot context\ntoken fields\n(context_window_size,\nremaining)"},"classes":"system context","position":{"x":950,"y":220}},
+    {"data":{"id":"copilot-sid-label","label":"remove Sid\nlabel"},"classes":"task completed","position":{"x":740,"y":260}},
+    {"data":{"id":"copilot-custom-script","label":"custom statusline\nscript + AI\nInstructions symlink"},"classes":"task completed","position":{"x":820,"y":380}},
+    {"data":{"id":"context-limit-reporting","label":"context limit\nreporting fix"},"classes":"task completed","position":{"x":820,"y":520}},
+
+    // Cluster 4: Claude Statusline Overhaul (col x ≈ 1080-1240) — day's biggest hub
+    {"data":{"id":"claude-statusline-overhaul","label":"Claude Code\nstatusline\noverhaul"},"classes":"task completed","position":{"x":1140,"y":100}},
+    {"data":{"id":"cost-bug-fix","label":"cost field bug\n(.cost.total_cost_usd)"},"classes":"decision completed","position":{"x":1040,"y":260}},
+    {"data":{"id":"statusline-fields","label":"statusline.sh\nnew fields\n(UUID, workspace,\nrate limits)"},"classes":"task completed","position":{"x":1240,"y":300}},
+    {"data":{"id":"ccstatusline-evaluation","label":"ccstatusline OTS\nevaluation\n(parked)"},"classes":"decision context","position":{"x":1140,"y":480}}
+  ],
+  "edges": [
+    {"data":{"source":"claude-settings-sync","target":"local-yaml-chained-symlinks","label":"depends on"},"classes":"strong-edge"},
+    {"data":{"source":"local-yaml-chained-symlinks","target":"sync-sh-symlinks","label":"enables"},"classes":"strong-edge"},
+    {"data":{"source":"sync-sh-symlinks","target":"ai-client-config-docs","label":"documented in"}},
+    {"data":{"source":"copilot-statusline","target":"copilot-context-tokens","label":"reads"},"classes":"strong-edge"},
+    {"data":{"source":"copilot-statusline","target":"copilot-sid-label","label":"leads to"}},
+    {"data":{"source":"copilot-sid-label","target":"copilot-custom-script","label":"part of"}},
+    {"data":{"source":"copilot-custom-script","target":"context-limit-reporting","label":"refined by"}},
+    {"data":{"source":"mcpx-permissions-gate","target":"agentgateway-dns-cascade","label":"parallel to"},"classes":"weak-edge"},
+    {"data":{"source":"agentgateway-dns-cascade","target":"rfc-1035-underscores","label":"surfaces"},"classes":"strong-edge"},
+    {"data":{"source":"mcpx-permissions-gate","target":"gateway-readmes","label":"motivates"}},
+    {"data":{"source":"agentgateway-dns-cascade","target":"gateway-readmes","label":"motivates"}},
+    {"data":{"source":"per-machine-config","target":"gateway-readmes","label":"TODO for"},"classes":"weak-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"cost-bug-fix","label":"discovers"},"classes":"strong-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"statusline-fields","label":"adds to"},"classes":"strong-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"ccstatusline-evaluation","label":"evaluates"}},
+    {"data":{"source":"copilot-statusline","target":"claude-statusline-overhaul","label":"informs"},"classes":"weak-edge"}
+  ]
+};
+
+const elements = [
+  ...SIDECAR.nodes.map(n => ({ group: "nodes", data: { ...n.data, displayLabel: n.data.label }, classes: n.classes, position: n.position })),
+  ...SIDECAR.edges.map(e => ({ group: "edges", data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || "" }))
+];
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements,
+  layout: { name: 'preset', fit: false },
+  minZoom: 0.1,
+  maxZoom: 3,
+  wheelSensitivity: 0.3,                                    // PROPOSED: smoother zoom
+  style: [
+    { selector: 'node', style: {
+      'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+      color: '#1e1e2e',
+      label: 'data(displayLabel)', 'font-family': 'sans-serif',
+      'font-size': 11, 'font-weight': 500,                  // PROPOSED: 11px / 500
+      'text-valign': 'center', 'text-halign': 'center',
+      'text-wrap': 'wrap', 'text-max-width': '100px',
+      width: 'label', height: 'label', padding: '12px',     // PROPOSED: label-sized
+      shape: 'round-rectangle', 'z-index': 10
+    }},
+    { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+    { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+    { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+    { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+    { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+    { selector: 'node.task',      style: { shape: 'ellipse' }},
+    { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+    { selector: 'edge', style: {
+      width: 4,                                             // PROPOSED: 4px (matches legacy)
+      'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+      'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
+      'curve-style': 'bezier',
+      color: '#a6adc8', label: 'data(displayLabel)',
+      'font-size': 11, 'font-family': 'sans-serif',         // PROPOSED: 11px
+      'font-weight': 'normal',                              // PROPOSED: normal weight
+      'text-background-color': '#1e1e2e',
+      'text-background-opacity': 0.92,                      // PROPOSED: 0.92
+      'text-background-padding': '4px',
+      'z-index': 1
+    }},
+    { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+    { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+  ]
+});
+
+// PROPOSED: hover edge highlight — mouseover node thickens + recolors connected edges
+const HIGHLIGHT = '#89b4fa'; // --interactive-accent
+cy.on('mouseover', 'node', (evt) => {
+  evt.target.style('border-width', 4);
+  evt.target.connectedEdges().style({
+    'line-color': HIGHLIGHT,
+    'target-arrow-color': HIGHLIGHT,
+    width: 5
+  });
+});
+cy.on('mouseout', 'node', (evt) => {
+  evt.target.style('border-width', 2);
+  evt.target.connectedEdges().forEach((edge) => {
+    edge.removeStyle('line-color');
+    edge.removeStyle('target-arrow-color');
+    edge.removeStyle('width');
+  });
+});
+
+cy.ready(() => { cy.resize(); cy.fit(undefined, 40); });
+</script>
+</body>
+</html>

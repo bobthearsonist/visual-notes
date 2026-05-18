@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — CURRENT plugin style (today's note 2026-05-18)</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --bg-secondary: #181825;
+    --text: #cdd6f4;
+    --text-muted: #a6adc8;
+    --text-faint: #6c7086;
+    --border: #45475a;
+    --completed-bg: #a6e3a1; --completed: #40a02b;
+    --active-bg: #f9e2af; --active: #df8e1d;
+    --context-bg: #89b4fa; --context: #1e66f5;
+    --blocked-bg: #f38ba8; --blocked: #d20f39;
+    --edge: #8c8fa1;
+    --edge-strong: #cdd6f4;
+    --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 1rem; }
+  .preview-label { font-size: 12px; color: var(--text-muted); margin-bottom: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+  .preview-label strong { color: var(--text); }
+  .preview-label .tag { display: inline-block; padding: 1px 6px; background: #f38ba8; color: #1e1e2e; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; }
+  .vn-container { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); }
+  .vn-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 0.75rem 1rem 0.5rem; }
+  .vn-heading { flex: 1 1 auto; }
+  .vn-title { font-weight: 700; color: var(--text); }
+  .vn-subtitle { color: var(--text-muted); font-size: 12px; margin-top: 0.25rem; }
+  .vn-legend { display: flex; flex: 0 1 34rem; flex-direction: column; gap: 0.3rem; align-items: flex-end; color: var(--text-muted); font-size: 11px; text-align: right; }
+  .vn-legend-group { display: flex; flex-wrap: wrap; gap: 0.25rem 0.35rem; align-items: center; justify-content: flex-end; }
+  .vn-legend-label { color: var(--text-faint); font-weight: 600; text-transform: uppercase; margin-right: 0.1rem; }
+  .vn-legend-item { display: inline-flex; gap: 0.25rem; align-items: center; white-space: nowrap; }
+  .vn-legend-swatch { width: 0.75rem; height: 0.75rem; border: 1px solid var(--border); background: var(--bg-secondary); }
+  .vn-legend-status-completed { background: #a6e3a1; border-color: #40a02b; }
+  .vn-legend-status-active    { background: #f9e2af; border-color: #df8e1d; }
+  .vn-legend-status-context   { background: #89b4fa; border-color: #1e66f5; }
+  .vn-legend-status-blocked   { background: #f38ba8; border-color: #d20f39; }
+  .vn-legend-type-system  { border-radius: 0.2rem; }
+  .vn-legend-type-task    { border-radius: 999px; }
+  .vn-legend-type-decision{ width: 0.6rem; height: 0.6rem; margin: 0 0.075rem; transform: rotate(45deg); }
+  .vn-legend-edge-strong, .vn-legend-edge-weak { width: 1.2rem; height: 0; border: 0; border-top: 2px solid var(--text-muted); background: transparent; }
+  .vn-legend-edge-strong { border-top-width: 3px; border-top-color: var(--text); }
+  .vn-legend-edge-weak   { border-top-style: dashed; }
+  #cy { height: 70vh; min-height: 560px; width: 100%; }
+  .vn-source { border-top: 1px solid var(--border); padding: 0.5rem 1rem 0.65rem; color: var(--text-muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="preview-label"><span class="tag">CURRENT</span> <strong>Plugin renderer as of main (pre-issue-21)</strong> · today's note (2026-05-18) · positions from on-disk sidecar (already grid'd by <code>applyDeterministicLayout</code>) · styling from <code>renderer.ts createStyle()</code></div>
+<div class="vn-container">
+  <div class="vn-header">
+    <div class="vn-heading">
+      <div class="vn-title">Daily Overview</div>
+      <div class="vn-subtitle">Claude/Copilot statusline + settings sync + MCP gateway hardening</div>
+    </div>
+    <div class="vn-legend">
+      <div class="vn-legend-group"><div class="vn-legend-label">Status</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-completed"></div>done</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-active"></div>active</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-context"></div>context</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-status-blocked"></div>blocked</div></div>
+      <div class="vn-legend-group"><div class="vn-legend-label">Type</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-system"></div>system</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-task"></div>task</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-type-decision"></div>decision</div></div>
+      <div class="vn-legend-group"><div class="vn-legend-label">Edge</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-edge-strong"></div>strong</div>
+        <div class="vn-legend-item"><div class="vn-legend-swatch vn-legend-edge-weak"></div>weak</div></div>
+    </div>
+  </div>
+  <div id="cy"></div>
+  <div class="vn-source">Source: Daily Context (7 sources) · current plugin renderer · 17,839 in / 4,578 out tokens · $0.0407</div>
+</div>
+<script>
+const SIDECAR = {
+  "nodes": [
+    {"data":{"id":"claude-settings-sync","label":"Claude settings\nsync chain"},"classes":"task completed","position":{"x":280,"y":485}},
+    {"data":{"id":"sync-sh-symlinks","label":"sync.sh chained\nsymlinks"},"classes":"system completed","position":{"x":110,"y":485}},
+    {"data":{"id":"ai-client-config-docs","label":"ai-client-config\nSKILL.md"},"classes":"task completed","position":{"x":280,"y":360}},
+    {"data":{"id":"copilot-statusline","label":"Copilot CLI\nstatusline"},"classes":"task completed","position":{"x":620,"y":110}},
+    {"data":{"id":"copilot-sid-label","label":"remove Sid\nlabel"},"classes":"task completed","position":{"x":790,"y":110}},
+    {"data":{"id":"copilot-custom-script","label":"custom statusline\nscript + AI\nInstructions symlink"},"classes":"task completed","position":{"x":790,"y":235}},
+    {"data":{"id":"context-limit-reporting","label":"context limit\nreporting fix"},"classes":"task completed","position":{"x":790,"y":360}},
+    {"data":{"id":"mcpx-permissions-gate","label":"mcpx permissions\ngate (16 → 136\ntools)"},"classes":"decision completed","position":{"x":280,"y":110}},
+    {"data":{"id":"agentgateway-dns-cascade","label":"agentgateway\nDNS cascade\n(4 layers)"},"classes":"decision completed","position":{"x":110,"y":235}},
+    {"data":{"id":"gateway-readmes","label":"gateway readmes\nrewrite (shared\nlayout)"},"classes":"task completed","position":{"x":280,"y":235}},
+    {"data":{"id":"claude-statusline-overhaul","label":"Claude Code\nstatusline\noverhaul"},"classes":"task completed","position":{"x":620,"y":235}},
+    {"data":{"id":"cost-bug-fix","label":"cost field bug\n(.cost.total_cost_usd)"},"classes":"decision completed","position":{"x":450,"y":235}},
+    {"data":{"id":"statusline-fields","label":"statusline.sh\nnew fields\n(UUID, workspace,\nrate limits)"},"classes":"task completed","position":{"x":450,"y":360}},
+    {"data":{"id":"ccstatusline-evaluation","label":"ccstatusline OTS\nevaluation\n(parked)"},"classes":"decision context","position":{"x":620,"y":360}},
+    {"data":{"id":"per-machine-config","label":"per-machine\nconfig override TODO\n(mcpx, agentgateway)"},"classes":"task active","position":{"x":450,"y":485}},
+    {"data":{"id":"rfc-1035-underscores","label":"RFC 1035:\nagentgateway rejects\nunderscores"},"classes":"decision context","position":{"x":110,"y":110}},
+    {"data":{"id":"local-yaml-chained-symlinks","label":"local.yaml:\nclaude symlink +\nchained settings.json"},"classes":"system completed","position":{"x":110,"y":360}},
+    {"data":{"id":"copilot-context-tokens","label":"Copilot context\ntoken fields\n(context_window_size,\nremaining)"},"classes":"system context","position":{"x":450,"y":110}}
+  ],
+  "edges": [
+    {"data":{"source":"claude-settings-sync","target":"sync-sh-symlinks","label":"depends on"},"classes":"strong-edge"},
+    {"data":{"source":"sync-sh-symlinks","target":"local-yaml-chained-symlinks","label":"enables"},"classes":"strong-edge"},
+    {"data":{"source":"claude-settings-sync","target":"ai-client-config-docs","label":"documented in"}},
+    {"data":{"source":"copilot-statusline","target":"copilot-context-tokens","label":"reads"},"classes":"strong-edge"},
+    {"data":{"source":"copilot-statusline","target":"copilot-sid-label","label":"leads to"}},
+    {"data":{"source":"copilot-sid-label","target":"copilot-custom-script","label":"part of"}},
+    {"data":{"source":"copilot-custom-script","target":"context-limit-reporting","label":"refined by"}},
+    {"data":{"source":"mcpx-permissions-gate","target":"agentgateway-dns-cascade","label":"parallel to"},"classes":"weak-edge"},
+    {"data":{"source":"agentgateway-dns-cascade","target":"rfc-1035-underscores","label":"surfaces"},"classes":"strong-edge"},
+    {"data":{"source":"mcpx-permissions-gate","target":"gateway-readmes","label":"motivates"}},
+    {"data":{"source":"agentgateway-dns-cascade","target":"gateway-readmes","label":"motivates"}},
+    {"data":{"source":"per-machine-config","target":"gateway-readmes","label":"TODO for"},"classes":"weak-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"cost-bug-fix","label":"discovers"},"classes":"strong-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"statusline-fields","label":"adds to"},"classes":"strong-edge"},
+    {"data":{"source":"claude-statusline-overhaul","target":"ccstatusline-evaluation","label":"evaluates"}},
+    {"data":{"source":"copilot-statusline","target":"claude-statusline-overhaul","label":"informs"},"classes":"weak-edge"}
+  ]
+};
+
+const elements = [
+  ...SIDECAR.nodes.map(n => ({ group: "nodes", data: { ...n.data, displayLabel: n.data.label }, classes: n.classes, position: n.position })),
+  ...SIDECAR.edges.map(e => ({ group: "edges", data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || "" }))
+];
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements,
+  layout: { name: 'preset', fit: false },
+  minZoom: 0.1,
+  maxZoom: 3,
+  // CURRENT: no wheelSensitivity override
+  style: [
+    { selector: 'node', style: {
+      'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+      color: '#1e1e2e',
+      label: 'data(displayLabel)', 'font-family': 'sans-serif',
+      'font-size': 13, 'font-weight': 600,                  // CURRENT: 13px / 600
+      'text-valign': 'center', 'text-halign': 'center',
+      'text-wrap': 'wrap', 'text-max-width': '100px',
+      height: 54, width: 118, padding: '12px',              // CURRENT: fixed 54x118 cards
+      shape: 'round-rectangle', 'z-index': 10
+    }},
+    { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+    { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+    { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+    { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+    { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+    { selector: 'node.task',      style: { shape: 'ellipse' }},
+    { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+    { selector: 'edge', style: {
+      width: 2,                                             // CURRENT: 2px
+      'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+      'target-arrow-shape': 'triangle', 'arrow-scale': 0.8,
+      'curve-style': 'bezier',
+      color: '#1e1e2e', label: 'data(displayLabel)',
+      'font-size': 14, 'font-family': 'sans-serif',         // CURRENT: 14px
+      'font-weight': 700,                                   // CURRENT: 700 (shouts)
+      'text-background-color': '#1e1e2e',
+      'text-background-opacity': 0.95,                      // CURRENT: 0.95
+      'text-background-padding': '5px',
+      'z-index': 1
+    }},
+    { selector: 'edge.strong-edge', style: { width: 3, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+    { selector: 'edge.weak-edge',   style: { width: 1, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+  ]
+});
+cy.ready(() => { cy.resize(); cy.fit(undefined, 40); });
+// CURRENT: no hover handler bound
+</script>
+</body>
+</html>
