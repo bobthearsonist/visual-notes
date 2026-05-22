@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — ELK compound clusters (off-the-shelf) vs LLM narrative</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script src="https://unpkg.com/cytoscape-elk@2.2.0/dist/cytoscape-elk.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e; --bg-secondary: #181825;
+    --text: #cdd6f4; --text-muted: #a6adc8; --text-faint: #6c7086;
+    --border: #45475a; --interactive-accent: #89b4fa;
+    --edge: #8c8fa1; --edge-strong: #cdd6f4; --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 0.75rem; }
+  .top-bar { display: flex; gap: 1rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .top-bar strong { color: var(--text); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; height: calc(100vh - 5rem); }
+  .panel { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .panel-header { padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .panel-header .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; color: #1e1e2e; }
+  .panel-header .tag-elk { background: #94e2d5; }
+  .panel-header .tag-llm  { background: #a6e3a1; }
+  .panel-header .desc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .panel-header strong { color: var(--text); }
+  .cy-container { flex: 1; min-height: 400px; }
+  .footer-note { padding: 6px 12px; color: var(--text-muted); font-size: 10px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <span><strong>Architectural test:</strong> use off-the-shelf ELK layered layout + cytoscape compound nodes derived from existing sectionId data. No custom layout code. ~10 lines of config replaces the repair pass.</span>
+</div>
+<div class="split">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-elk">ELK + COMPOUNDS</span><strong>Cluster compounds from sectionId, ELK layered layout</strong>
+      <div class="desc">Off-the-shelf cytoscape-elk · clusters as compound parents (existing <code>data.sectionId</code>) · <code>elk.direction: DOWN</code> puts hub-at-top automatically</div>
+    </div>
+    <div class="cy-container" id="cy-elk"></div>
+    <div class="footer-note">All positioning by ELK. ~10 lines of config. Clusters labeled with the AI-session ordinal from sectionId.</div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-llm">LLM</span><strong>Narrative-positioned (hand-curated, current trust-LLM design)</strong>
+      <div class="desc">Cluster columns (settings → MCP → Copilot → Claude statusline) with status tiers, hub-at-top per cluster</div>
+    </div>
+    <div class="cy-container" id="cy-llm"></div>
+    <div class="footer-note">Positions follow extract-graph.md heuristics. What the post-#21 plugin renders after force-regenerate.</div>
+  </div>
+</div>
+<script>
+cytoscape.use(window.cytoscapeElk);
+
+const STYLE = [
+  { selector: 'node[!isParent]', style: {
+    'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+    color: '#1e1e2e',
+    label: 'data(displayLabel)', 'font-family': 'sans-serif',
+    'font-size': 11, 'font-weight': 500,
+    'text-valign': 'center', 'text-halign': 'center',
+    'text-wrap': 'wrap', 'text-max-width': '100px',
+    width: 'label', height: 'label', padding: '12px',
+    shape: 'round-rectangle', 'z-index': 10
+  }},
+  { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+  { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+  { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+  { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+  { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+  { selector: 'node.task',      style: { shape: 'ellipse' }},
+  { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+
+  // Compound parent (cluster) styling
+  { selector: 'node[?isParent]', style: {
+    'background-color': '#181825', 'background-opacity': 0.4,
+    'border-color': '#45475a', 'border-width': 1, 'border-style': 'dashed',
+    label: 'data(displayLabel)', 'text-valign': 'top', 'text-halign': 'center',
+    color: '#a6adc8', 'font-size': 10, 'font-weight': 600,
+    'text-margin-y': -4, 'padding': '18px',
+    shape: 'round-rectangle', 'z-index': 1
+  }},
+  { selector: 'edge', style: {
+    width: 4, 'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+    'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
+    'curve-style': 'bezier', color: '#a6adc8', label: 'data(displayLabel)',
+    'font-size': 11, 'font-family': 'sans-serif', 'font-weight': 'normal',
+    'text-background-color': '#1e1e2e', 'text-background-opacity': 0.92,
+    'text-background-padding': '4px', 'z-index': 1
+  }},
+  { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+  { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+];
+
+// Pull a short, human-readable cluster label out of the verbose sectionId.
+// Section IDs look like: "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-..."
+// We want: "claude settings sync chain"
+function shortClusterLabel(sectionId) {
+  const m = sectionId.match(/2026-05-18-([a-z0-9-]+?)-2026-05-18/);
+  if (m) return m[1].replace(/-/g, ' ');
+  return sectionId.slice(0, 40);
+}
+
+const NARRATIVE_POSITIONS = {
+  "claude-settings-sync":         { x: 140,  y: 120 },
+  "local-yaml-chained-symlinks":  { x: 140,  y: 280 },
+  "sync-sh-symlinks":             { x: 60,   y: 420 },
+  "ai-client-config-docs":        { x: 220,  y: 560 },
+  "mcpx-permissions-gate":        { x: 420,  y: 100 },
+  "agentgateway-dns-cascade":     { x: 580,  y: 160 },
+  "rfc-1035-underscores":         { x: 580,  y: 300 },
+  "gateway-readmes":              { x: 420,  y: 420 },
+  "per-machine-config":           { x: 420,  y: 580 },
+  "copilot-statusline":           { x: 820,  y: 100 },
+  "copilot-context-tokens":       { x: 950,  y: 220 },
+  "copilot-sid-label":            { x: 740,  y: 260 },
+  "copilot-custom-script":        { x: 820,  y: 380 },
+  "context-limit-reporting":      { x: 820,  y: 520 },
+  "claude-statusline-overhaul":   { x: 1140, y: 100 },
+  "cost-bug-fix":                 { x: 1040, y: 260 },
+  "statusline-fields":            { x: 1240, y: 300 },
+  "ccstatusline-evaluation":      { x: 1140, y: 480 }
+};
+
+function applyHover(cy) {
+  const HIGHLIGHT = '#89b4fa';
+  cy.on('mouseover', 'node[!isParent]', (evt) => {
+    evt.target.style('border-width', 4);
+    evt.target.connectedEdges().style({ 'line-color': HIGHLIGHT, 'target-arrow-color': HIGHLIGHT, width: 5 });
+  });
+  cy.on('mouseout', 'node[!isParent]', (evt) => {
+    evt.target.style('border-width', 2);
+    evt.target.connectedEdges().forEach((edge) => {
+      edge.removeStyle('line-color'); edge.removeStyle('target-arrow-color'); edge.removeStyle('width');
+    });
+  });
+}
+
+fetch('2026-05-18-today-data.json')
+  .then(r => r.json())
+  .then(SIDECAR => {
+    // Discover unique sectionIds → make a compound parent per cluster.
+    const sectionIds = [...new Set(SIDECAR.nodes.map(n => n.data.sectionId).filter(Boolean))];
+    const parentNodes = sectionIds.map(sid => ({
+      group: 'nodes',
+      data: { id: 'cluster:' + sid, displayLabel: shortClusterLabel(sid), isParent: true }
+    }));
+
+    // LEFT: ELK + compound nodes
+    const elementsElk = [
+      ...parentNodes,
+      ...SIDECAR.nodes.map(n => ({
+        group: 'nodes',
+        data: { ...n.data, displayLabel: n.data.label, parent: n.data.sectionId ? 'cluster:' + n.data.sectionId : undefined },
+        classes: n.classes
+      })),
+      ...SIDECAR.edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
+    ];
+    const cyElk = cytoscape({
+      container: document.getElementById('cy-elk'),
+      elements: elementsElk,
+      layout: {
+        name: 'elk',
+        fit: true,
+        padding: 30,
+        elk: {
+          algorithm: 'layered',
+          'elk.direction': 'DOWN',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '60',
+          'elk.spacing.nodeNode': '40',
+          'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+          'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+          'elk.padding': '[top=24,left=12,bottom=12,right=12]',
+          'elk.aspectRatio': '1.6'
+        }
+      },
+      style: STYLE,
+      minZoom: 0.05, maxZoom: 3, wheelSensitivity: 0.3
+    });
+    applyHover(cyElk);
+
+    // RIGHT: narrative-positioned (no compounds, preset)
+    const elementsLlm = [
+      ...SIDECAR.nodes.map(n => ({
+        group: 'nodes',
+        data: { ...n.data, displayLabel: n.data.label },
+        classes: n.classes,
+        position: NARRATIVE_POSITIONS[n.data.id] || n.position
+      })),
+      ...SIDECAR.edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
+    ];
+    const cyLlm = cytoscape({
+      container: document.getElementById('cy-llm'),
+      elements: elementsLlm,
+      layout: { name: 'preset', fit: true, padding: 40 },
+      style: STYLE,
+      minZoom: 0.05, maxZoom: 3, wheelSensitivity: 0.3
+    });
+    applyHover(cyLlm);
+  })
+  .catch(err => {
+    document.body.insertAdjacentHTML('beforeend', '<div style="color:#f38ba8;padding:1rem">Failed: ' + err.message + '</div>');
+    console.error(err);
+  });
+</script>
+</body>
+</html>

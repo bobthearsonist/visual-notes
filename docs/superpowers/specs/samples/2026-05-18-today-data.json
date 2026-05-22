@@ -1,0 +1,379 @@
+{
+  "kind": "daily-overview",
+  "title": "Daily Overview - 2026-05-18",
+  "header": "Daily Overview",
+  "subtitle": "Claude/Copilot statusline + settings sync + MCP gateway hardening",
+  "nodes": [
+    {
+      "data": {
+        "id": "claude-settings-sync",
+        "label": "Claude settings\nsync chain",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 280,
+        "y": 485
+      }
+    },
+    {
+      "data": {
+        "id": "sync-sh-symlinks",
+        "label": "sync.sh chained\nsymlinks",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18"
+      },
+      "classes": "system completed",
+      "position": {
+        "x": 110,
+        "y": 485
+      }
+    },
+    {
+      "data": {
+        "id": "ai-client-config-docs",
+        "label": "ai-client-config\nSKILL.md",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 280,
+        "y": 360
+      }
+    },
+    {
+      "data": {
+        "id": "copilot-statusline",
+        "label": "Copilot CLI\nstatusline",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-cli-statusline-context-2026-05-18-copilot-cli-statusline-context-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 620,
+        "y": 110
+      }
+    },
+    {
+      "data": {
+        "id": "copilot-sid-label",
+        "label": "remove Sid\nlabel",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-cleanup-2026-05-18-copilot-statusline-cleanup-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 790,
+        "y": 110
+      }
+    },
+    {
+      "data": {
+        "id": "copilot-custom-script",
+        "label": "custom statusline\nscript + AI\nInstructions symlink",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-config-2026-05-18-copilot-statusline-config-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 790,
+        "y": 235
+      }
+    },
+    {
+      "data": {
+        "id": "context-limit-reporting",
+        "label": "context limit\nreporting fix",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-context-limit-2026-05-18-copilot-statusline-context-limit-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 790,
+        "y": 360
+      }
+    },
+    {
+      "data": {
+        "id": "mcpx-permissions-gate",
+        "label": "mcpx permissions\ngate (16 → 136\ntools)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18"
+      },
+      "classes": "decision completed",
+      "position": {
+        "x": 280,
+        "y": 110
+      }
+    },
+    {
+      "data": {
+        "id": "agentgateway-dns-cascade",
+        "label": "agentgateway\nDNS cascade\n(4 layers)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18"
+      },
+      "classes": "decision completed",
+      "position": {
+        "x": 110,
+        "y": 235
+      }
+    },
+    {
+      "data": {
+        "id": "gateway-readmes",
+        "label": "gateway readmes\nrewrite (shared\nlayout)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 280,
+        "y": 235
+      }
+    },
+    {
+      "data": {
+        "id": "claude-statusline-overhaul",
+        "label": "Claude Code\nstatusline\noverhaul",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 620,
+        "y": 235
+      }
+    },
+    {
+      "data": {
+        "id": "cost-bug-fix",
+        "label": "cost field bug\n(.cost.total_cost_usd)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18"
+      },
+      "classes": "decision completed",
+      "position": {
+        "x": 450,
+        "y": 235
+      }
+    },
+    {
+      "data": {
+        "id": "statusline-fields",
+        "label": "statusline.sh\nnew fields\n(UUID, workspace,\nrate limits)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18"
+      },
+      "classes": "task completed",
+      "position": {
+        "x": 450,
+        "y": 360
+      }
+    },
+    {
+      "data": {
+        "id": "ccstatusline-evaluation",
+        "label": "ccstatusline OTS\nevaluation\n(parked)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18"
+      },
+      "classes": "decision context",
+      "position": {
+        "x": 620,
+        "y": 360
+      }
+    },
+    {
+      "data": {
+        "id": "per-machine-config",
+        "label": "per-machine\nconfig override TODO\n(mcpx, agentgateway)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18"
+      },
+      "classes": "task active",
+      "position": {
+        "x": 450,
+        "y": 485
+      }
+    },
+    {
+      "data": {
+        "id": "rfc-1035-underscores",
+        "label": "RFC 1035:\nagentgateway rejects\nunderscores",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18"
+      },
+      "classes": "decision context",
+      "position": {
+        "x": 110,
+        "y": 110
+      }
+    },
+    {
+      "data": {
+        "id": "local-yaml-chained-symlinks",
+        "label": "local.yaml:\nclaude symlink +\nchained settings.json",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18"
+      },
+      "classes": "system completed",
+      "position": {
+        "x": 110,
+        "y": 360
+      }
+    },
+    {
+      "data": {
+        "id": "copilot-context-tokens",
+        "label": "Copilot context\ntoken fields\n(context_window_size,\nremaining)",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-cli-statusline-context-2026-05-18-copilot-cli-statusline-context-md-2026-05-18"
+      },
+      "classes": "system context",
+      "position": {
+        "x": 450,
+        "y": 110
+      }
+    }
+  ],
+  "edges": [
+    {
+      "data": {
+        "source": "claude-settings-sync",
+        "target": "sync-sh-symlinks",
+        "label": "depends on",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18",
+        "id": "edge-claude-settings-sync-sync-sh-symlinks-depends-on"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "sync-sh-symlinks",
+        "target": "local-yaml-chained-symlinks",
+        "label": "enables",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18",
+        "id": "edge-sync-sh-symlinks-local-yaml-chained-symlinks-enables"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "claude-settings-sync",
+        "target": "ai-client-config-docs",
+        "label": "documented in",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-claude-settings-sync-chain-md-2026-05-18",
+        "id": "edge-claude-settings-sync-ai-client-config-docs-documented-in"
+      }
+    },
+    {
+      "data": {
+        "source": "copilot-statusline",
+        "target": "copilot-context-tokens",
+        "label": "reads",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-cli-statusline-context-2026-05-18-copilot-cli-statusline-context-md-2026-05-18",
+        "id": "edge-copilot-statusline-copilot-context-tokens-reads"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "copilot-statusline",
+        "target": "copilot-sid-label",
+        "label": "leads to",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-cleanup-2026-05-18-copilot-statusline-cleanup-md-2026-05-18",
+        "id": "edge-copilot-statusline-copilot-sid-label-leads-to"
+      }
+    },
+    {
+      "data": {
+        "source": "copilot-sid-label",
+        "target": "copilot-custom-script",
+        "label": "part of",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-config-2026-05-18-copilot-statusline-config-md-2026-05-18",
+        "id": "edge-copilot-sid-label-copilot-custom-script-part-of"
+      }
+    },
+    {
+      "data": {
+        "source": "copilot-custom-script",
+        "target": "context-limit-reporting",
+        "label": "refined by",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-copilot-statusline-context-limit-2026-05-18-copilot-statusline-context-limit-md-2026-05-18",
+        "id": "edge-copilot-custom-script-context-limit-reporting-refined-by"
+      }
+    },
+    {
+      "data": {
+        "source": "mcpx-permissions-gate",
+        "target": "agentgateway-dns-cascade",
+        "label": "parallel to",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18",
+        "id": "edge-mcpx-permissions-gate-agentgateway-dns-cascade-parallel-to"
+      },
+      "classes": "weak-edge"
+    },
+    {
+      "data": {
+        "source": "agentgateway-dns-cascade",
+        "target": "rfc-1035-underscores",
+        "label": "surfaces",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18",
+        "id": "edge-agentgateway-dns-cascade-rfc-1035-underscores-surfaces"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "mcpx-permissions-gate",
+        "target": "gateway-readmes",
+        "label": "motivates",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18",
+        "id": "edge-mcpx-permissions-gate-gateway-readmes-motivates"
+      }
+    },
+    {
+      "data": {
+        "source": "agentgateway-dns-cascade",
+        "target": "gateway-readmes",
+        "label": "motivates",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18",
+        "id": "edge-agentgateway-dns-cascade-gateway-readmes-motivates"
+      }
+    },
+    {
+      "data": {
+        "source": "per-machine-config",
+        "target": "gateway-readmes",
+        "label": "TODO for",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-mcp-gateway-hardening-2026-05-18-mcp-gateway-hardening-md-2026-05-18",
+        "id": "edge-per-machine-config-gateway-readmes-todo-for"
+      },
+      "classes": "weak-edge"
+    },
+    {
+      "data": {
+        "source": "claude-statusline-overhaul",
+        "target": "cost-bug-fix",
+        "label": "discovers",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18",
+        "id": "edge-claude-statusline-overhaul-cost-bug-fix-discovers"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "claude-statusline-overhaul",
+        "target": "statusline-fields",
+        "label": "adds to",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18",
+        "id": "edge-claude-statusline-overhaul-statusline-fields-adds-to"
+      },
+      "classes": "strong-edge"
+    },
+    {
+      "data": {
+        "source": "claude-statusline-overhaul",
+        "target": "ccstatusline-evaluation",
+        "label": "evaluates",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18",
+        "id": "edge-claude-statusline-overhaul-ccstatusline-evaluation-evaluates"
+      }
+    },
+    {
+      "data": {
+        "source": "copilot-statusline",
+        "target": "claude-statusline-overhaul",
+        "label": "informs",
+        "sectionId": "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-statusline-overhaul-2026-05-18-statusline-overhaul-md-2026-05-18",
+        "id": "edge-copilot-statusline-claude-statusline-overhaul-informs"
+      },
+      "classes": "weak-edge"
+    }
+  ]
+}
