@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — divided-container per-cluster layouts vs LLM narrative</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script src="https://unpkg.com/cytoscape-elk@2.2.0/dist/cytoscape-elk.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e; --bg-secondary: #181825; --bg-tertiary: #11111b;
+    --text: #cdd6f4; --text-muted: #a6adc8; --text-faint: #6c7086;
+    --border: #45475a; --interactive-accent: #89b4fa;
+    --edge: #8c8fa1; --edge-strong: #cdd6f4; --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 0.75rem; }
+  .top-bar { display: flex; gap: 1rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .top-bar strong { color: var(--text); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; height: calc(100vh - 5rem); }
+  .panel { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .panel-header { padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .panel-header .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; color: #1e1e2e; }
+  .panel-header .tag-div { background: #f9e2af; }
+  .panel-header .tag-llm  { background: #a6e3a1; }
+  .panel-header .desc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .panel-header strong { color: var(--text); }
+  .footer-note { padding: 6px 12px; color: var(--text-muted); font-size: 10px; border-top: 1px solid var(--border); }
+
+  /* Left: divided container into N cluster cells.
+     Sized so each mini-layout has room to breathe at zoom ~1.0
+     (was minmax 220/180 — too tight; cells were auto-zooming to 0.7) */
+  .cluster-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    grid-auto-rows: minmax(340px, 1fr);
+    gap: 10px;
+    padding: 10px;
+    overflow: auto;
+    background: var(--bg-tertiary);
+  }
+  .cluster-cell {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg);
+    min-height: 340px;
+  }
+  .cluster-title {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    text-transform: lowercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cluster-title .count {
+    margin-left: 4px;
+    color: var(--text-faint);
+    font-weight: normal;
+  }
+  .cluster-canvas {
+    flex: 1;
+    min-height: 140px;
+  }
+  .cross-cluster-bar {
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-muted);
+    max-height: 80px;
+    overflow-y: auto;
+  }
+  .cross-cluster-bar h4 {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .cross-cluster-bar .x-edge {
+    margin: 1px 0;
+  }
+  .cross-cluster-bar .x-edge code {
+    color: var(--text);
+    font-size: 10px;
+  }
+  .cross-cluster-bar .weak { color: var(--text-faint); }
+
+  /* Right: LLM narrative single canvas */
+  #cy-llm { flex: 1; min-height: 400px; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <span><strong>Architectural test:</strong> divide the canvas container into one cell per cluster (sectionId). Each cluster gets its own mini cytoscape with ELK layered layout. Cross-cluster edges listed in footer. No compound packing constraints → no crowding.</span>
+</div>
+<div class="split">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-div">DIVIDED CONTAINER</span><strong>N small canvases — one per cluster</strong>
+      <div class="desc">Each cell auto-fits its own subgraph · ELK layered DOWN per cluster · hub at top, descendants below</div>
+    </div>
+    <div class="cluster-grid" id="clusterGrid"></div>
+    <div class="cross-cluster-bar" id="crossClusterBar"></div>
+    <div class="footer-note">Per-cluster layout removes the compound-packing crowding. Cross-cluster edges become a separate overlay problem.</div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-llm">LLM</span><strong>Narrative-positioned (single canvas, hand-curated)</strong>
+      <div class="desc">Reference comparison — what we've been calling "trust LLM positions"</div>
+    </div>
+    <div id="cy-llm"></div>
+    <div class="footer-note">Same data, traditional single-canvas approach with narrative positions.</div>
+  </div>
+</div>
+<script>
+cytoscape.use(window.cytoscapeElk);
+
+const STYLE = [
+  { selector: 'node', style: {
+    'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+    color: '#1e1e2e',
+    label: 'data(displayLabel)', 'font-family': 'sans-serif',
+    'font-size': 11, 'font-weight': 500,
+    'text-valign': 'center', 'text-halign': 'center',
+    'text-wrap': 'wrap', 'text-max-width': '100px',
+    width: 'label', height: 'label', padding: '12px',
+    shape: 'round-rectangle', 'z-index': 10
+  }},
+  { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+  { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+  { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+  { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+  { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+  { selector: 'node.task',      style: { shape: 'ellipse' }},
+  { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+  { selector: 'edge', style: {
+    width: 4, 'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+    'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
+    'curve-style': 'bezier', color: '#a6adc8', label: 'data(displayLabel)',
+    'font-size': 11, 'font-family': 'sans-serif', 'font-weight': 'normal',
+    'text-background-color': '#1e1e2e', 'text-background-opacity': 0.92,
+    'text-background-padding': '4px', 'z-index': 1
+  }},
+  { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+  { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+];
+
+function shortClusterLabel(sectionId) {
+  const m = sectionId.match(/2026-05-18-([a-z0-9-]+?)-2026-05-18/);
+  if (m) return m[1].replace(/-/g, ' ');
+  return sectionId.slice(0, 40);
+}
+
+// HARDCODED for this preview only. Simulates what `data.cluster_id`
+// (a coarser semantic field than sectionId) would produce if Claude
+// tagged it during extraction. Real implementation should put this
+// decision in the extraction prompt, not in the renderer.
+function coalesceCluster(sectionId) {
+  const label = shortClusterLabel(sectionId);
+  if (/statusline|copilot/.test(label)) return 'statusline work';
+  if (/mcp|agentgateway|gateway/.test(label)) return 'mcp gateway';
+  if (/settings|sync|symlink|client-config/.test(label)) return 'settings sync';
+  return label;
+}
+
+const NARRATIVE_POSITIONS = {
+  "claude-settings-sync":         { x: 140,  y: 120 },
+  "local-yaml-chained-symlinks":  { x: 140,  y: 280 },
+  "sync-sh-symlinks":             { x: 60,   y: 420 },
+  "ai-client-config-docs":        { x: 220,  y: 560 },
+  "mcpx-permissions-gate":        { x: 420,  y: 100 },
+  "agentgateway-dns-cascade":     { x: 580,  y: 160 },
+  "rfc-1035-underscores":         { x: 580,  y: 300 },
+  "gateway-readmes":              { x: 420,  y: 420 },
+  "per-machine-config":           { x: 420,  y: 580 },
+  "copilot-statusline":           { x: 820,  y: 100 },
+  "copilot-context-tokens":       { x: 950,  y: 220 },
+  "copilot-sid-label":            { x: 740,  y: 260 },
+  "copilot-custom-script":        { x: 820,  y: 380 },
+  "context-limit-reporting":      { x: 820,  y: 520 },
+  "claude-statusline-overhaul":   { x: 1140, y: 100 },
+  "cost-bug-fix":                 { x: 1040, y: 260 },
+  "statusline-fields":            { x: 1240, y: 300 },
+  "ccstatusline-evaluation":      { x: 1140, y: 480 }
+};
+
+function applyHover(cy) {
+  const HIGHLIGHT = '#89b4fa';
+  cy.on('mouseover', 'node', (evt) => {
+    evt.target.style('border-width', 4);
+    evt.target.connectedEdges().style({ 'line-color': HIGHLIGHT, 'target-arrow-color': HIGHLIGHT, width: 5 });
+  });
+  cy.on('mouseout', 'node', (evt) => {
+    evt.target.style('border-width', 2);
+    evt.target.connectedEdges().forEach((edge) => {
+      edge.removeStyle('line-color'); edge.removeStyle('target-arrow-color'); edge.removeStyle('width');
+    });
+  });
+}
+
+fetch('2026-05-18-today-data.json')
+  .then(r => r.json())
+  .then(SIDECAR => {
+    // Group nodes by coalesced cluster_id (simulates LLM-tagged semantic grouping)
+    const clusters = new Map();
+    for (const node of SIDECAR.nodes) {
+      const sid = node.data.sectionId || '__no-section__';
+      const clusterKey = coalesceCluster(sid);
+      if (!clusters.has(clusterKey)) clusters.set(clusterKey, { nodes: [], edges: [] });
+      clusters.get(clusterKey).nodes.push(node);
+    }
+
+    // Bin edges: intra-cluster vs cross-cluster (after coalesce — edges between
+    // sectionIds that fold into the same cluster become intra-cluster)
+    const nodeToCluster = new Map(
+      SIDECAR.nodes.map(n => [n.data.id, coalesceCluster(n.data.sectionId || '__no-section__')])
+    );
+    const crossClusterEdges = [];
+    for (const edge of SIDECAR.edges) {
+      const srcCluster = nodeToCluster.get(edge.data.source);
+      const tgtCluster = nodeToCluster.get(edge.data.target);
+      if (srcCluster && tgtCluster && srcCluster === tgtCluster) {
+        clusters.get(srcCluster).edges.push(edge);
+      } else {
+        crossClusterEdges.push({
+          edge,
+          srcSection: srcCluster || '?',
+          tgtSection: tgtCluster || '?'
+        });
+      }
+    }
+
+    // Sort clusters by size (largest first) so the visually-dominant ones
+    // get prime real estate in the auto-fit grid
+    const sortedClusters = [...clusters.entries()].sort((a, b) => b[1].nodes.length - a[1].nodes.length);
+
+    // Build per-cluster mini-cytoscape instances
+    const grid = document.getElementById('clusterGrid');
+    for (const [clusterKey, { nodes, edges }] of sortedClusters) {
+      const cell = document.createElement('div');
+      cell.className = 'cluster-cell';
+
+      const title = document.createElement('div');
+      title.className = 'cluster-title';
+      title.innerHTML = `${clusterKey}<span class="count">(${nodes.length})</span>`;
+      cell.appendChild(title);
+
+      const canvas = document.createElement('div');
+      canvas.className = 'cluster-canvas';
+      cell.appendChild(canvas);
+      grid.appendChild(cell);
+
+      const elements = [
+        ...nodes.map(n => ({ group: 'nodes', data: { ...n.data, displayLabel: n.data.label }, classes: n.classes })),
+        ...edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
+      ];
+
+      // Single-node clusters: skip ELK (no edges) and just preset at center
+      const layoutOpts = nodes.length === 1
+        ? { name: 'preset', fit: true, padding: 10, positions: () => ({ x: 0, y: 0 }) }
+        : {
+            name: 'elk',
+            fit: true,
+            padding: 10,
+            elk: {
+              algorithm: 'layered',
+              'elk.direction': 'DOWN',
+              'elk.layered.spacing.nodeNodeBetweenLayers': '40',
+              'elk.spacing.nodeNode': '30',
+              'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP'
+            }
+          };
+
+      const cyMini = cytoscape({
+        container: canvas,
+        elements,
+        layout: layoutOpts,
+        style: STYLE,
+        minZoom: 0.05, maxZoom: 3, wheelSensitivity: 0.3
+      });
+      applyHover(cyMini);
+    }
+
+    // Cross-cluster edge footer
+    const xBar = document.getElementById('crossClusterBar');
+    if (crossClusterEdges.length === 0) {
+      xBar.innerHTML = '<em style="color: var(--text-faint)">(no cross-cluster edges)</em>';
+    } else {
+      xBar.innerHTML = '<h4>Cross-cluster connections (' + crossClusterEdges.length + ')</h4>' +
+        crossClusterEdges.map(({ edge, srcSection, tgtSection }) => {
+          const isWeak = (edge.classes || '').includes('weak-edge');
+          return `<div class="x-edge ${isWeak ? 'weak' : ''}"><code>${srcSection}</code> · <code>${edge.data.source}</code> <strong>—${edge.data.label}→</strong> <code>${tgtSection}</code> · <code>${edge.data.target}</code>${isWeak ? ' <em>(weak)</em>' : ''}</div>`;
+        }).join('');
+    }
+
+    // RIGHT: LLM narrative single-canvas reference (unchanged from previous comparison)
+    const elementsLlm = [
+      ...SIDECAR.nodes.map(n => ({
+        group: 'nodes',
+        data: { ...n.data, displayLabel: n.data.label },
+        classes: n.classes,
+        position: NARRATIVE_POSITIONS[n.data.id] || n.position
+      })),
+      ...SIDECAR.edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
+    ];
+    const cyLlm = cytoscape({
+      container: document.getElementById('cy-llm'),
+      elements: elementsLlm,
+      layout: { name: 'preset', fit: true, padding: 40 },
+      style: STYLE,
+      minZoom: 0.05, maxZoom: 3, wheelSensitivity: 0.3
+    });
+    applyHover(cyLlm);
+  })
+  .catch(err => {
+    document.body.insertAdjacentHTML('beforeend', '<div style="color:#f38ba8;padding:1rem">Failed: ' + err.message + '</div>');
+    console.error(err);
+  });
+</script>
+</body>
+</html>

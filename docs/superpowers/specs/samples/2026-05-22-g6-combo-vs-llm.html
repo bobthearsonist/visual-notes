@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — G6 Combo (AntV G6 v5) vs LLM narrative</title>
+<script src="https://unpkg.com/@antv/g6@5/dist/g6.min.js"></script>
+<!-- Cytoscape for the right LLM panel (unchanged from elk-compound-vs-llm) -->
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e; --bg-secondary: #181825;
+    --text: #cdd6f4; --text-muted: #a6adc8; --text-faint: #6c7086;
+    --border: #45475a; --interactive-accent: #89b4fa;
+    --edge: #8c8fa1; --edge-strong: #cdd6f4; --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 0.75rem; }
+  .top-bar { display: flex; gap: 1rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .top-bar strong { color: var(--text); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; height: calc(100vh - 5rem); }
+  .panel { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .panel-header { padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .panel-header .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; color: #1e1e2e; }
+  .panel-header .tag-g6  { background: #89dceb; } /* cyan accent */
+  .panel-header .tag-llm { background: #a6e3a1; }
+  .panel-header .desc { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .panel-header strong { color: var(--text); }
+  .cy-container { flex: 1; min-height: 400px; }
+  #g6-container { flex: 1; min-height: 400px; position: relative; overflow: hidden; }
+  #g6-canvas-wrap { width: 100%; height: 100%; }
+  .footer-note { padding: 6px 12px; color: var(--text-muted); font-size: 10px; border-top: 1px solid var(--border); }
+  .error-banner { color: #f38ba8; padding: 8px 12px; font-size: 11px; font-family: monospace; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <span><strong>Architectural test:</strong> AntV G6 v5 with native Combo containers + combo-combined layout (antv-dagre TB inner, gForce outer). Compares against LLM narrative layout. Research motivation: cytoscape-elk compound spacing bug (elk.spacing.nodeNode) has no upstream fix.</span>
+</div>
+<div class="split">
+  <!-- LEFT: G6 v5 Combo panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-g6">G6 COMBO</span><strong>AntV G6 v5 — Combo nodes + per-combo dagre layout</strong>
+      <div class="desc">Native Combo containers · <code>combo-combined</code> layout · <code>innerLayout: antv-dagre, rankdir: TB</code> · hub-at-top per cluster · 3 semantic clusters coalesced from 7 sectionIds</div>
+    </div>
+    <div id="g6-container">
+      <div id="g6-canvas-wrap"></div>
+    </div>
+    <div class="footer-note" id="g6-footer">Loading G6 v5…</div>
+  </div>
+  <!-- RIGHT: LLM narrative panel (verbatim from elk-compound-vs-llm.html) -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="tag tag-llm">LLM</span><strong>Narrative-positioned (hand-curated, current trust-LLM design)</strong>
+      <div class="desc">Cluster columns (settings → MCP → Copilot → Claude statusline) with status tiers, hub-at-top per cluster</div>
+    </div>
+    <div class="cy-container" id="cy-llm"></div>
+    <div class="footer-note">Positions follow extract-graph.md heuristics. What the post-#21 plugin renders after force-regenerate.</div>
+  </div>
+</div>
+<script>
+// ─── Shared helpers ────────────────────────────────────────────────────────────
+
+function coalesceCluster(sectionId) {
+  const m = sectionId.match(/2026-05-18-([a-z0-9-]+?)-2026-05-18/);
+  const label = m ? m[1].replace(/-/g, ' ') : sectionId.slice(0, 40);
+  if (/statusline|copilot/.test(label)) return 'statusline work';
+  if (/mcp|agentgateway|gateway/.test(label)) return 'mcp gateway';
+  if (/settings|sync|symlink|client-config/.test(label)) return 'settings sync';
+  return label;
+}
+
+// ─── Status/type → visual mapping ─────────────────────────────────────────────
+
+// Parse "system completed" → { type: 'system', status: 'completed' }
+function parseClasses(classStr) {
+  const parts = (classStr || '').trim().split(/\s+/);
+  return { type: parts[0] || 'task', status: parts[1] || 'context' };
+}
+
+const STATUS_FILL   = { completed: '#a6e3a1', active: '#f9e2af', context: '#89b4fa', blocked: '#f38ba8' };
+const STATUS_STROKE = { completed: '#40a02b', active: '#df8e1d', context: '#1e66f5', blocked: '#d20f39' };
+const TYPE_SHAPE    = { system: 'rect', task: 'ellipse', decision: 'diamond' };
+
+// ─── Cytoscape style (right panel — copied from elk-compound-vs-llm.html) ────
+
+const CY_STYLE = [
+  { selector: 'node[!isParent]', style: {
+    'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+    color: '#1e1e2e',
+    label: 'data(displayLabel)', 'font-family': 'sans-serif',
+    'font-size': 11, 'font-weight': 500,
+    'text-valign': 'center', 'text-halign': 'center',
+    'text-wrap': 'wrap', 'text-max-width': '100px',
+    width: 'label', height: 'label', padding: '12px',
+    shape: 'round-rectangle', 'z-index': 10
+  }},
+  { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+  { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+  { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+  { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+  { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+  { selector: 'node.task',      style: { shape: 'ellipse' }},
+  { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+  { selector: 'node[?isParent]', style: {
+    'background-color': '#11111b', 'background-opacity': 0.85,
+    'border-color': '#6c7086', 'border-width': 2, 'border-style': 'dashed',
+    label: 'data(displayLabel)', 'text-valign': 'top', 'text-halign': 'left',
+    color: '#cdd6f4', 'font-size': 11, 'font-weight': 700,
+    'text-margin-y': -4, 'text-margin-x': 10,
+    'padding': '14px', shape: 'round-rectangle', 'z-index': 1
+  }},
+  { selector: 'edge', style: {
+    width: 4, 'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+    'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
+    'curve-style': 'bezier', color: '#a6adc8', label: 'data(displayLabel)',
+    'font-size': 11, 'font-family': 'sans-serif', 'font-weight': 'normal',
+    'text-background-color': '#1e1e2e', 'text-background-opacity': 0.92,
+    'text-background-padding': '4px', 'z-index': 1
+  }},
+  { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+  { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+];
+
+const NARRATIVE_POSITIONS = {
+  "claude-settings-sync":         { x: 140,  y: 120 },
+  "local-yaml-chained-symlinks":  { x: 140,  y: 280 },
+  "sync-sh-symlinks":             { x: 60,   y: 420 },
+  "ai-client-config-docs":        { x: 220,  y: 560 },
+  "mcpx-permissions-gate":        { x: 420,  y: 100 },
+  "agentgateway-dns-cascade":     { x: 580,  y: 160 },
+  "rfc-1035-underscores":         { x: 580,  y: 300 },
+  "gateway-readmes":              { x: 420,  y: 420 },
+  "per-machine-config":           { x: 420,  y: 580 },
+  "copilot-statusline":           { x: 820,  y: 100 },
+  "copilot-context-tokens":       { x: 950,  y: 220 },
+  "copilot-sid-label":            { x: 740,  y: 260 },
+  "copilot-custom-script":        { x: 820,  y: 380 },
+  "context-limit-reporting":      { x: 820,  y: 520 },
+  "claude-statusline-overhaul":   { x: 1140, y: 100 },
+  "cost-bug-fix":                 { x: 1040, y: 260 },
+  "statusline-fields":            { x: 1240, y: 300 },
+  "ccstatusline-evaluation":      { x: 1140, y: 480 }
+};
+
+function applyCyHover(cy) {
+  const HIGHLIGHT = '#89b4fa';
+  cy.on('mouseover', 'node[!isParent]', (evt) => {
+    evt.target.style('border-width', 4);
+    evt.target.connectedEdges().style({ 'line-color': HIGHLIGHT, 'target-arrow-color': HIGHLIGHT, width: 5 });
+  });
+  cy.on('mouseout', 'node[!isParent]', (evt) => {
+    evt.target.style('border-width', 2);
+    evt.target.connectedEdges().forEach((edge) => {
+      edge.removeStyle('line-color'); edge.removeStyle('target-arrow-color'); edge.removeStyle('width');
+    });
+  });
+}
+
+// ─── Main: load data, then build both panels ────────────────────────────────
+
+console.log('G6 available:', typeof window.G6 !== 'undefined' ? 'YES — ' + (window.G6.version || 'version unknown') : 'NO — G6 failed to load');
+
+fetch('2026-05-18-today-data.json')
+  .then(r => r.json())
+  .then(SIDECAR => {
+    buildLlmPanel(SIDECAR);
+    buildG6Panel(SIDECAR);
+  })
+  .catch(err => {
+    document.getElementById('g6-footer').textContent = 'Data load failed: ' + err.message;
+    document.getElementById('g6-canvas-wrap').innerHTML = '<div class="error-banner">Failed to load JSON: ' + err.message + '</div>';
+    console.error('fetch error', err);
+  });
+
+// ─── RIGHT panel: LLM narrative (Cytoscape preset) ─────────────────────────
+
+function buildLlmPanel(SIDECAR) {
+  const elementsLlm = [
+    ...SIDECAR.nodes.map(n => ({
+      group: 'nodes',
+      data: { ...n.data, displayLabel: n.data.label },
+      classes: n.classes,
+      position: NARRATIVE_POSITIONS[n.data.id] || n.position
+    })),
+    ...SIDECAR.edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
+  ];
+  const cyLlm = cytoscape({
+    container: document.getElementById('cy-llm'),
+    elements: elementsLlm,
+    layout: { name: 'preset', fit: true, padding: 40 },
+    style: CY_STYLE,
+    minZoom: 0.05, maxZoom: 3, wheelSensitivity: 0.3
+  });
+  applyCyHover(cyLlm);
+}
+
+// ─── LEFT panel: G6 v5 Combo ────────────────────────────────────────────────
+
+function buildG6Panel(SIDECAR) {
+  if (typeof window.G6 === 'undefined') {
+    document.getElementById('g6-footer').textContent = 'ERROR: G6 not loaded from CDN.';
+    document.getElementById('g6-canvas-wrap').innerHTML =
+      '<div class="error-banner">window.G6 is undefined — CDN script failed to load. Check network / console.</div>';
+    return;
+  }
+
+  // Build cluster → combo ID mapping
+  const clusterKeys = [...new Set(
+    SIDECAR.nodes.map(n => coalesceCluster(n.data.sectionId || ''))
+  )];
+
+  // G6 v5 data format: nodes and combos are separate arrays
+  // Each node: { id, combo: comboId, data: {...}, style: {...} }
+  // Each combo: { id, data: {...}, style: {...} }
+
+  const combos = clusterKeys.map(key => ({
+    id: 'combo:' + key,
+    data: { label: key },
+    style: {
+      labelText: key,
+      labelPlacement: 'top',
+      labelFontSize: 11,
+      labelFontWeight: 700,
+      labelFill: '#cdd6f4',
+      labelOffsetY: -8,
+      fill: '#11111b',
+      fillOpacity: 0.85,
+      stroke: '#6c7086',
+      lineWidth: 2,
+      lineDash: [6, 4],
+      padding: [24, 16, 16, 16],
+    }
+  }));
+
+  const nodes = SIDECAR.nodes.map(n => {
+    const cluster = coalesceCluster(n.data.sectionId || '');
+    const { type, status } = parseClasses(n.classes);
+    const fill   = STATUS_FILL[status]   || '#89b4fa';
+    const stroke = STATUS_STROKE[status] || '#1e66f5';
+    // G6 v5: `type` is a top-level field on the node object, not inside style.
+    // Available built-ins: 'rect', 'ellipse', 'diamond', 'circle', 'star', etc.
+    const g6Type = TYPE_SHAPE[type] || 'rect';
+    const nodeSize = g6Type === 'diamond' ? [120, 52] : [120, 40];
+    return {
+      id: n.data.id,
+      type: g6Type,             // top-level — not inside style
+      combo: 'combo:' + cluster,
+      data: { label: n.data.label, nodeType: type, status, sectionId: n.data.sectionId },
+      style: {
+        labelText: n.data.label,
+        labelPlacement: 'center',
+        labelFontSize: 11,
+        labelFontWeight: 500,
+        labelFill: '#1e1e2e',
+        labelWordWrap: true,
+        labelMaxWidth: 110,
+        fill,
+        stroke,
+        lineWidth: 2,
+        size: nodeSize,
+        // rect nodes get a slight radius for round-rectangle look
+        ...(g6Type === 'rect' ? { radius: 6 } : {}),
+      }
+    };
+  });
+
+  const edges = SIDECAR.edges.map(e => {
+    const cls = (e.classes || '').trim();
+    let lineWidth = 4, lineDash = undefined, stroke = '#8c8fa1';
+    if (cls === 'strong-edge') { lineWidth = 5; stroke = '#cdd6f4'; }
+    if (cls === 'weak-edge')   { lineWidth = 3; stroke = '#bcc0cc'; lineDash = [6, 4]; }
+    return {
+      id: e.data.id || (e.data.source + '->' + e.data.target),
+      source: e.data.source,
+      target: e.data.target,
+      data: { label: e.data.label, classes: cls },
+      style: {
+        labelText: e.data.label || '',
+        labelFontSize: 11,
+        labelFontWeight: 400,
+        labelFill: '#a6adc8',
+        labelBackgroundFill: '#1e1e2e',
+        labelBackgroundOpacity: 0.92,
+        labelBackgroundPadding: [3, 4],
+        stroke,
+        lineWidth,
+        ...(lineDash ? { lineDash } : {}),
+        endArrow: true,
+        endArrowType: 'vee',
+        endArrowFill: stroke,
+      }
+    };
+  });
+
+  const container = document.getElementById('g6-canvas-wrap');
+  const containerRect = document.getElementById('g6-container').getBoundingClientRect();
+  const W = Math.max(containerRect.width  || 600, 600);
+  const H = Math.max(containerRect.height || 500, 500);
+
+  let graph;
+  try {
+    graph = new G6.Graph({
+      container,
+      width:  W,
+      height: H,
+      data: { nodes, edges, combos },
+      node: {
+        // Global node defaults — per-node style overrides these
+        style: {
+          size: [120, 40],
+          labelPlacement: 'center',
+          labelFontSize: 11,
+          labelWordWrap: true,
+          labelMaxWidth: 110,
+        }
+      },
+      combo: {
+        type: 'rect',
+        style: {
+          radius: 8,
+          labelPlacement: 'top',
+          labelFontSize: 11,
+          labelFontWeight: 700,
+          labelFill: '#cdd6f4',
+          fill: '#11111b',
+          fillOpacity: 0.85,
+          stroke: '#6c7086',
+          lineWidth: 2,
+          lineDash: [6, 4],
+          padding: [28, 16, 16, 16],
+          labelText: (d) => d.data.label || d.id,
+        }
+      },
+      edge: {
+        style: {
+          endArrow: true,
+          endArrowType: 'vee',
+          labelFontSize: 11,
+          labelBackgroundFill: '#1e1e2e',
+          labelBackgroundOpacity: 0.92,
+        }
+      },
+      layout: {
+        type: 'combo-combined',
+        // outer layout: gForce (default) spreads combos apart.
+        // We don't use 'grid' here because the combo-combined docs show
+        // gForce/ForceLayout as the supported outer layout; grid needs to be
+        // passed as a layout instance which requires @antv/layout separately.
+        // The gForce spreads 3 combos naturally; fitView after render tidies it.
+        // inner layout: antv-dagre TB for each combo (hub-at-top)
+        innerLayout: {
+          type: 'antv-dagre',
+          rankdir: 'TB',
+          nodesep: 30,
+          ranksep: 50,
+          align: 'UL',
+        },
+      },
+      behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element'],
+      autoResize: false,
+      background: '#1e1e2e',
+    });
+  } catch (e) {
+    document.getElementById('g6-canvas-wrap').innerHTML =
+      '<div class="error-banner">G6 Graph init error: ' + e.message + '</div>';
+    document.getElementById('g6-footer').textContent = 'G6 init failed — see error above.';
+    console.error('G6 init error:', e);
+    return;
+  }
+
+  // Hover highlight: thicken connected edges on mouseover
+  graph.on('node:pointerenter', (evt) => {
+    const nodeId = evt.target.id;
+    const allEdges = graph.getEdgeData();
+    allEdges.forEach(edge => {
+      const isConnected = edge.source === nodeId || edge.target === nodeId;
+      if (isConnected) {
+        graph.updateEdgeData([{
+          id: edge.id,
+          style: { stroke: '#89b4fa', lineWidth: (edge.style?.lineWidth || 4) + 2 }
+        }]);
+      }
+    });
+    graph.draw();
+  });
+
+  graph.on('node:pointerleave', (evt) => {
+    // Restore all edges to their original style from data
+    const allEdgeData = graph.getEdgeData();
+    allEdgeData.forEach(edge => {
+      const cls = edge.data?.classes || '';
+      let lineWidth = 4, stroke = '#8c8fa1';
+      if (cls === 'strong-edge') { lineWidth = 5; stroke = '#cdd6f4'; }
+      if (cls === 'weak-edge')   { lineWidth = 3; stroke = '#bcc0cc'; }
+      graph.updateEdgeData([{ id: edge.id, style: { stroke, lineWidth } }]);
+    });
+    graph.draw();
+  });
+
+  graph.render()
+    .then(() => {
+      graph.fitView({ padding: 40 });
+      const footer = document.getElementById('g6-footer');
+      footer.textContent =
+        'G6 v5 · combo-combined layout · antv-dagre TB inner · ' +
+        nodes.length + ' nodes · ' + edges.length + ' edges · ' +
+        combos.length + ' combo clusters · window.G6 confirmed loaded';
+    })
+    .catch(err => {
+      document.getElementById('g6-footer').textContent = 'G6 render error: ' + err.message;
+      console.error('G6 render error:', err);
+    });
+}
+</script>
+</body>
+</html>

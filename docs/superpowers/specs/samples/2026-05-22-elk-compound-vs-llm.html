@@ -73,13 +73,14 @@ const STYLE = [
   { selector: 'node.task',      style: { shape: 'ellipse' }},
   { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
 
-  // Compound parent (cluster) styling
+  // Compound parent (cluster) styling — visible without eating interior space
   { selector: 'node[?isParent]', style: {
-    'background-color': '#181825', 'background-opacity': 0.4,
-    'border-color': '#45475a', 'border-width': 1, 'border-style': 'dashed',
-    label: 'data(displayLabel)', 'text-valign': 'top', 'text-halign': 'center',
-    color: '#a6adc8', 'font-size': 10, 'font-weight': 600,
-    'text-margin-y': -4, 'padding': '18px',
+    'background-color': '#11111b', 'background-opacity': 0.85,
+    'border-color': '#6c7086', 'border-width': 2, 'border-style': 'dashed',
+    label: 'data(displayLabel)', 'text-valign': 'top', 'text-halign': 'left',
+    color: '#cdd6f4', 'font-size': 11, 'font-weight': 700,
+    'text-margin-y': -4, 'text-margin-x': 10,
+    'padding': '14px',
     shape: 'round-rectangle', 'z-index': 1
   }},
   { selector: 'edge', style: {
@@ -95,12 +96,22 @@ const STYLE = [
 ];
 
 // Pull a short, human-readable cluster label out of the verbose sectionId.
-// Section IDs look like: "dc-ai-session-ai-session-0-ai-sessions-2026-05-18-claude-settings-sync-chain-2026-05-18-..."
-// We want: "claude settings sync chain"
 function shortClusterLabel(sectionId) {
   const m = sectionId.match(/2026-05-18-([a-z0-9-]+?)-2026-05-18/);
   if (m) return m[1].replace(/-/g, ' ');
   return sectionId.slice(0, 40);
+}
+
+// HARDCODED for this preview only. Simulates what `data.cluster_id`
+// (a coarser semantic field than sectionId) would produce if Claude
+// tagged it during extraction. Real implementation puts this decision
+// in the extraction prompt, not in the renderer.
+function coalesceCluster(sectionId) {
+  const label = shortClusterLabel(sectionId);
+  if (/statusline|copilot/.test(label)) return 'statusline work';
+  if (/mcp|agentgateway|gateway/.test(label)) return 'mcp gateway';
+  if (/settings|sync|symlink|client-config/.test(label)) return 'settings sync';
+  return label;
 }
 
 const NARRATIVE_POSITIONS = {
@@ -141,19 +152,24 @@ function applyHover(cy) {
 fetch('2026-05-18-today-data.json')
   .then(r => r.json())
   .then(SIDECAR => {
-    // Discover unique sectionIds → make a compound parent per cluster.
-    const sectionIds = [...new Set(SIDECAR.nodes.map(n => n.data.sectionId).filter(Boolean))];
-    const parentNodes = sectionIds.map(sid => ({
+    // Discover unique COALESCED cluster keys → one compound parent per
+    // semantic cluster (simulates LLM-tagged data.cluster_id).
+    const clusterKeys = [...new Set(SIDECAR.nodes.map(n => coalesceCluster(n.data.sectionId || '')).filter(Boolean))];
+    const parentNodes = clusterKeys.map(key => ({
       group: 'nodes',
-      data: { id: 'cluster:' + sid, displayLabel: shortClusterLabel(sid), isParent: true }
+      data: { id: 'cluster:' + key, displayLabel: key, isParent: true }
     }));
 
-    // LEFT: ELK + compound nodes
+    // LEFT: ELK + compound nodes (children parented by coalesced cluster)
     const elementsElk = [
       ...parentNodes,
       ...SIDECAR.nodes.map(n => ({
         group: 'nodes',
-        data: { ...n.data, displayLabel: n.data.label, parent: n.data.sectionId ? 'cluster:' + n.data.sectionId : undefined },
+        data: {
+          ...n.data,
+          displayLabel: n.data.label,
+          parent: n.data.sectionId ? 'cluster:' + coalesceCluster(n.data.sectionId) : undefined
+        },
         classes: n.classes
       })),
       ...SIDECAR.edges.map(e => ({ group: 'edges', data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || '' }))
@@ -163,17 +179,26 @@ fetch('2026-05-18-today-data.json')
       elements: elementsElk,
       layout: {
         name: 'elk',
-        fit: true,
-        padding: 30,
+        fit: false,
+        // cytoscape-elk@2.2.0 strips an `elk.` prefix. Try BOTH formats
+        // so whichever the binding accepts takes effect.
         elk: {
           algorithm: 'layered',
-          'elk.direction': 'DOWN',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '60',
-          'elk.spacing.nodeNode': '40',
-          'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-          'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-          'elk.padding': '[top=24,left=12,bottom=12,right=12]',
-          'elk.aspectRatio': '1.6'
+          direction: 'DOWN',
+          // unprefixed (binding may pass straight through)
+          'spacing.baseValue': '80',
+          'spacing.nodeNode': '100',
+          'spacing.componentComponent': '120',
+          'layered.spacing.nodeNodeBetweenLayers': '150',
+          'layered.spacing.baseValue': '80',
+          'layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+          'hierarchyHandling': 'INCLUDE_CHILDREN',
+          // also try the elk.-prefixed form in case the binding doesn't strip
+          'elk.spacing.baseValue': '80',
+          'elk.spacing.nodeNode': '100',
+          'elk.spacing.componentComponent': '120',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '150',
+          'elk.padding': '[top=36,left=22,bottom=22,right=22]'
         }
       },
       style: STYLE,
