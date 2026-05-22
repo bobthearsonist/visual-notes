@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Issue #21 — COSE library layout comparison (today's sidecar)</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #1e1e2e; --bg-secondary: #181825;
+    --text: #cdd6f4; --text-muted: #a6adc8; --text-faint: #6c7086;
+    --border: #45475a; --interactive-accent: #89b4fa;
+    --edge: #8c8fa1; --edge-strong: #cdd6f4; --edge-weak: #bcc0cc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 1rem; }
+  .toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; padding: 0.5rem 1rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+  .toolbar .tag { display: inline-block; padding: 1px 6px; background: #cba6f7; color: #1e1e2e; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .toolbar select { font-size: 11px; padding: 2px 6px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; margin-left: auto; }
+  .vn-container { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); }
+  .vn-header { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 0.75rem 1rem 0.5rem; }
+  .vn-title { font-weight: 700; color: var(--text); }
+  .vn-subtitle { color: var(--text-muted); font-size: 12px; margin-top: 0.25rem; }
+  #cy { height: 70vh; min-height: 560px; width: 100%; }
+  .vn-source { border-top: 1px solid var(--border); padding: 0.5rem 1rem 0.65rem; color: var(--text-muted); font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span class="tag">COSE LAYOUT</span>
+  <strong>Library-based force-directed layout</strong>
+  <span>· same data as real-sidecar.html · cytoscape's built-in cose</span>
+  <select id="layoutPicker">
+    <option value="cose">cose (force-directed, built-in)</option>
+    <option value="preset">preset (trust positions)</option>
+    <option value="grid">grid (uniform cells)</option>
+    <option value="concentric">concentric (by degree)</option>
+    <option value="breadthfirst">breadthfirst (tree-like)</option>
+    <option value="circle">circle</option>
+  </select>
+</div>
+<div class="vn-container">
+  <div class="vn-header">
+    <div>
+      <div class="vn-title" id="title">Daily Overview</div>
+      <div class="vn-subtitle" id="subtitle">Loading…</div>
+    </div>
+  </div>
+  <div id="cy"></div>
+  <div class="vn-source">Same 18 nodes / 16 edges as real-sidecar.html · pick a layout from the dropdown to compare · post-#21 styling on all</div>
+</div>
+<script>
+let cy = null;
+let SIDECAR = null;
+
+const STYLE = [
+  { selector: 'node', style: {
+    'background-color': '#89b4fa', 'border-color': '#45475a', 'border-width': 2,
+    color: '#1e1e2e',
+    label: 'data(displayLabel)', 'font-family': 'sans-serif',
+    'font-size': 11, 'font-weight': 500,
+    'text-valign': 'center', 'text-halign': 'center',
+    'text-wrap': 'wrap', 'text-max-width': '100px',
+    width: 'label', height: 'label', padding: '12px',
+    shape: 'round-rectangle', 'z-index': 10
+  }},
+  { selector: 'node.completed', style: { 'background-color': '#a6e3a1', 'border-color': '#40a02b' }},
+  { selector: 'node.active',    style: { 'background-color': '#f9e2af', 'border-color': '#df8e1d' }},
+  { selector: 'node.context',   style: { 'background-color': '#89b4fa', 'border-color': '#1e66f5' }},
+  { selector: 'node.blocked',   style: { 'background-color': '#f38ba8', 'border-color': '#d20f39' }},
+  { selector: 'node.system',    style: { shape: 'round-rectangle' }},
+  { selector: 'node.task',      style: { shape: 'ellipse' }},
+  { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
+  { selector: 'edge', style: {
+    width: 4,
+    'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
+    'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
+    'curve-style': 'bezier',
+    color: '#a6adc8', label: 'data(displayLabel)',
+    'font-size': 11, 'font-family': 'sans-serif', 'font-weight': 'normal',
+    'text-background-color': '#1e1e2e', 'text-background-opacity': 0.92,
+    'text-background-padding': '4px', 'z-index': 1
+  }},
+  { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+  { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+];
+
+function layoutOpts(name) {
+  const base = { name, fit: true, padding: 40, animate: false };
+  switch (name) {
+    case 'cose':       return { ...base, nodeRepulsion: 8000, idealEdgeLength: 120, nodeOverlap: 20 };
+    case 'concentric': return { ...base, concentric: (n) => n.degree(), levelWidth: () => 2, minNodeSpacing: 60 };
+    case 'breadthfirst': return { ...base, directed: true, spacingFactor: 1.4 };
+    case 'circle':     return { ...base, radius: 250 };
+    case 'grid':       return { ...base, rows: 4 };
+    case 'preset':     return { ...base, fit: false };
+    default:           return base;
+  }
+}
+
+function rebuild(layoutName) {
+  if (cy) cy.destroy();
+
+  const elements = [
+    ...SIDECAR.nodes.map(n => ({ group: "nodes", data: { ...n.data, displayLabel: n.data.label }, classes: n.classes, position: n.position })),
+    ...SIDECAR.edges.map(e => ({ group: "edges", data: { ...e.data, displayLabel: e.data.label }, classes: e.classes || "" }))
+  ];
+
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements,
+    layout: layoutOpts(layoutName),
+    style: STYLE,
+    minZoom: 0.1, maxZoom: 3, wheelSensitivity: 0.3
+  });
+
+  // Hover edge highlight (same as Task 13)
+  const HIGHLIGHT = '#89b4fa';
+  cy.on('mouseover', 'node', (evt) => {
+    evt.target.style('border-width', 4);
+    evt.target.connectedEdges().style({ 'line-color': HIGHLIGHT, 'target-arrow-color': HIGHLIGHT, width: 5 });
+  });
+  cy.on('mouseout', 'node', (evt) => {
+    evt.target.style('border-width', 2);
+    evt.target.connectedEdges().forEach((edge) => {
+      edge.removeStyle('line-color'); edge.removeStyle('target-arrow-color'); edge.removeStyle('width');
+    });
+  });
+}
+
+fetch('2026-05-18-today-data.json')
+  .then(r => r.json())
+  .then(data => {
+    SIDECAR = data;
+    document.getElementById('title').textContent = SIDECAR.header || 'Daily Overview';
+    document.getElementById('subtitle').textContent = SIDECAR.subtitle || '';
+    rebuild('cose');
+  });
+
+document.getElementById('layoutPicker').addEventListener('change', (e) => {
+  rebuild(e.target.value);
+});
+</script>
+</body>
+</html>
