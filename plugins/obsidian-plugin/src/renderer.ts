@@ -224,6 +224,13 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
 
   private createStyle(): cytoscape.StylesheetJson {
     const computed = getComputedStyle(this.containerEl);
+    // theme.muted is used for edge label text color (#21 styling pass moved
+    // edge labels from theme.nodeText/near-black to theme.muted so labels
+    // de-emphasize against bolder node fills). Obsidian defines --text-muted
+    // in both light and dark themes — Catppuccin Latte (light) gives ~#5c5f77,
+    // Mocha (dark) gives ~#a6adc8 — both legible against their respective
+    // --background-primary surfaces. Fallback #a6adc8 is dark-theme-shaped
+    // and only triggers in non-Obsidian dev contexts.
     const theme = {
       muted: getCssVariable(computed, "--text-muted", "#a6adc8"),
       background: getCssVariable(computed, "--background-primary", "#1e1e2e"),

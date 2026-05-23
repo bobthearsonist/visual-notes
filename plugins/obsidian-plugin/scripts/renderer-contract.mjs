@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { getSharedRendererSourceFailures } from "./shared-renderer-assertions.mjs";
 
 const expectedProfiseeFixture = {
   nodeIds: [
@@ -79,16 +80,10 @@ function evaluateFixtureContract() {
 }
 
 function evaluateRendererSourceContract(source) {
-  const contractFailures = [];
+  const contractFailures = [...getSharedRendererSourceFailures(source)];
   const nodeElementIndex = source.indexOf("...sidecar.nodes.map");
   const edgeElementIndex = source.indexOf("...sidecar.edges.map");
 
-  if (source.includes("applyDeterministicLayout")) {
-    contractFailures.push("renderer must not import or call applyDeterministicLayout");
-  }
-  if (!source.includes("this.renderGraph(sidecar);")) {
-    contractFailures.push("renderer must render the parsed sidecar directly");
-  }
   if (nodeElementIndex === -1 || edgeElementIndex === -1 || nodeElementIndex > edgeElementIndex) {
     contractFailures.push("renderer must emit sidecar nodes before sidecar edges");
   }
@@ -112,9 +107,6 @@ function evaluateRendererSourceContract(source) {
   }
   if (!source.includes('"target-arrow-shape": "triangle"')) {
     contractFailures.push("renderer must keep MVP triangle arrowheads");
-  }
-  if (!source.includes('"curve-style": "straight"')) {
-    contractFailures.push("renderer must use straight edges (bezier renders zero-size in cytoscape 3.28 — see #21 QA)");
   }
   if (
     !source.includes('"font-size": 11') ||
