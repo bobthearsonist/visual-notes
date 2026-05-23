@@ -89,7 +89,7 @@ export function getDailyContextApi(app: unknown): DailyContextApi | null {
 export function normalizeDailyContextDateFromPath(path: string): string | null {
   const normalizedPath = path.replace(/\\/g, "/");
   const basename = normalizedPath.split("/").pop()?.replace(/\.md$/iu, "") ?? normalizedPath;
-  return normalizeDateMatch(basename) ?? normalizeDateMatch(normalizedPath);
+  return normalizeWholeDate(basename);
 }
 
 export function buildDailyContextExtractionInput(
@@ -216,6 +216,14 @@ function normalizeDateMatch(value: string): string | null {
   const compact = value.match(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?:[^\d]|$)/u);
   if (compact) {
     return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  }
+
+  return null;
+}
+
+function normalizeWholeDate(value: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(value) || /^\d{8}$/u.test(value)) {
+    return normalizeDateMatch(value);
   }
 
   return null;

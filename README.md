@@ -1,15 +1,15 @@
 # Visual Notes
 
-> Turn an Obsidian daily note into a living concept map.
+> Turn Obsidian notes and AI session summaries into living concept maps.
 
-Visual Notes watches the markdown files you already use for daily notes,
-asks Claude to extract the main concepts and relationships, and renders an
+Visual Notes watches configured markdown folders, asks Claude to extract the
+main concepts and relationships, writes a JSON graph sidecar, and renders an
 interactive Cytoscape.js graph directly inside Obsidian.
 
-The markdown note stays the source of truth. Manual notes, AI session
-summaries, mobile edits, Templater output, and synced changes all flow
-through the same pipeline: if it lands in a watched note, it can appear in
-the visual.
+The markdown note stays the source of truth. Daily notes, AI session summaries,
+manual notes, mobile edits, Templater output, and synced changes all flow
+through the same plugin pipeline: if a watched note changes, it can be extracted
+and rendered.
 
 ## Why it is useful
 
@@ -22,54 +22,124 @@ the visual.
 - **Useful for memory and navigation:** nodes summarize important concepts;
   labeled edges explain why they matter.
 
-## What it does
+## Standalone capabilities
 
 ```mermaid
-flowchart LR
+flowchart TB
     classDef input fill:#eef2ff,stroke:#4f46e5,stroke-width:2px,color:#111827
     classDef plugin fill:#ecfeff,stroke:#0891b2,stroke-width:2px,color:#0f172a
     classDef ai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#111827
     classDef data fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#052e16
     classDef render fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#111827
-    classDef future fill:#f8fafc,stroke:#94a3b8,stroke-width:1px,stroke-dasharray: 5,5,color:#334155
+    classDef optional fill:#fff7ed,stroke:#ea580c,stroke-width:2px,stroke-dasharray: 5,5,color:#111827
 
-    subgraph Sources["Everyday note inputs"]
-        Manual["Manual notes"]
-        Sessions["AI session summaries"]
-        Mobile["Mobile edits"]
-        Templates["Templates and automations"]
+    subgraph Vault["Obsidian vault"]
+        Note[("Any watched markdown note")]
+        Sidecar[("Sibling graph sidecar<br/>{note-basename}-overview.json")]
     end
-
-    Note[("Watched daily note<br/>YYYYMMDD.md")]
 
     subgraph Plugin["Visual Notes Obsidian plugin"]
         Watch["Watch + debounce"]
-        Hash["Hash unchanged notes"]
-        Extract["Extract graph"]
+        Source["Choose source<br/>raw note by default"]
+        Hash["Hash + skip unchanged"]
+        Extract["Extract graph with Claude"]
         Validate["Validate schema"]
         Render["Render inline"]
     end
 
+    DailyContext["Optional Daily Context provider<br/>structured day sources"]
+    DateTags["Optional Date Tags provider<br/>date tag convention/API"]
     Claude(("Anthropic Claude"))
-    Sidecar[("Graph sidecar<br/>YYYYMMDD-overview.json")]
-    Pane["Interactive Cytoscape map<br/>inside the note"]
-    Future["Future: section-aware<br/>idempotent updates"]
+    Pane["Interactive Cytoscape visual<br/>inside the note"]
 
-    Manual --> Note
-    Sessions --> Note
-    Mobile --> Note
-    Templates --> Note
-    Note --> Watch --> Hash --> Extract --> Claude
+    Note --> Watch
+    DateTags -. can feed .-> DailyContext
+    DailyContext -. optional source adapter .-> Source
+    Watch --> Source --> Hash --> Extract --> Claude
     Claude --> Validate --> Sidecar --> Render --> Pane
-    Pane -. displayed above note content .-> Note
-    Future -. planned evolution .-> Hash
+    Sidecar -. read by .-> Render
+    Pane -. rendered in .-> Note
 
-    class Manual,Sessions,Mobile,Templates,Note input
-    class Watch,Hash,Extract,Validate,Render plugin
+    class Note input
+    class Watch,Source,Hash,Extract,Validate,Render plugin
     class Claude ai
     class Sidecar data
     class Pane render
-    class Future future
+    class DateTags,DailyContext optional
+```
+
+Visual Notes is useful by itself: configure any folder of markdown notes, provide
+an Anthropic key, and it can extract/render a graph for those notes. Daily
+Context and Date Tags are optional providers/adapters, not required runtime
+dependencies.
+
+| Component | Standalone responsibility | Optional integrations |
+|---|---|---|
+| Visual Notes plugin | Watches markdown, calls Claude, writes graph sidecars, renders Cytoscape inline. | Can consume Daily Context when present; can render explicit `visual-notes` blocks in templates. |
+| Daily Context plugin | Exposes structured date-scoped source lists through a versioned Obsidian API. | Can use Date Tags as its date-tag provider; can be consumed by Visual Notes or any other plugin/automation. |
+| Date Tags plugin | Maintains created/modified metadata and date tags. | Can provide tag-building semantics to Daily Context. |
+| AI session summary skill/template | Not part of the public plugin core; an integration recipe that writes ordinary markdown notes Visual Notes can watch. | Useful for AI-client session logging, but Visual Notes does not require it. |
+
+## Optional integration: AI session summaries
+
+One useful composition is AI session logging. In that workflow an AI-client skill
+creates an ordinary markdown session note from a vault template, then Visual
+Notes treats it like any other watched note.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Skill as obsidian-notes skill
+    participant Vault as Obsidian vault
+    participant VN as Visual Notes plugin
+    participant Claude as Anthropic Claude
+
+    User->>Skill: "make/end session summary"
+    Skill->>Vault: write AI session note from template
+    Vault-->>VN: watched session note modified
+    VN->>VN: raw-note extraction for non-date-named note
+    VN->>Claude: graph extraction request
+    Claude-->>VN: tool JSON graph
+    VN->>Vault: write session-overview.json
+    VN-->>User: render graph in visual-notes block
+```
+
+The template is an adapter detail, not a Visual Notes dependency. A good
+AI-session template can include:
+
+````markdown
+> [!summary] Session Summary
+> One-line summary.
+
+## Session Visual
+
+```visual-notes
+```
+
+## 2026-05-17
+````
+
+If you also use Date Tags/Daily Context, associate the session with a day via an
+explicit `date/YYYY/MM/DD` tag instead of adding a `[[YYYYMMDD]]` daily-note
+wikilink in the body.
+
+## Optional integration: daily overviews
+
+```mermaid
+sequenceDiagram
+    participant Daily as Daily note
+    participant DC as Daily Context
+    participant DT as Date Tags
+    participant VN as Visual Notes
+    participant Claude as Anthropic Claude
+
+    DT-->>DC: date tag convention/API
+    Daily->>VN: watched daily note modified or manual extract
+    VN->>DC: getDailyContext(date, include sources)
+    DC-->>VN: daily sections + AI session sources
+    VN->>Claude: graph extraction request
+    Claude-->>VN: tool JSON graph
+    VN->>Daily: render daily overview sidecar inline
 ```
 
 ## What it looks like in Obsidian
@@ -81,14 +151,16 @@ views. The graph is interactive; the note remains normal markdown underneath.
 
 Feature overview:
 
-- Watches one or more configured daily-note folders.
+- Watches one or more configured markdown folders, including daily-note folders
+  and AI session folders.
 - Debounces saves and skips unchanged content using a markdown hash.
-- Sends structured Daily Context sources to the Anthropic Messages API when
-  the `daily-context` plugin is available, otherwise falls back to full note
-  markdown.
+- Sends structured Daily Context sources to the Anthropic Messages API for
+  date-named daily notes when the `daily-context` plugin is available,
+  otherwise falls back to full note markdown.
 - Validates the returned graph against the shared sidecar schema.
-- Writes `{date}-overview.json` next to the note.
-- Renders the sidecar inline in reading and source views.
+- Writes `{note-basename}-overview.json` next to the note.
+- Renders the sidecar inline in reading/source views or in an explicit
+  `visual-notes` code block.
 - Supports pin/unpin/delete/regenerate commands for manual control.
 - Shows extraction count and status in the Obsidian status bar.
 - Tracks token usage and estimated cost metadata in the sidecar when the API
@@ -101,24 +173,33 @@ This repository contains two plugins and one shared schema:
 | Piece | Purpose | Status |
 |---|---|---|
 | [`plugins/obsidian-plugin`](plugins/obsidian-plugin/README.md) | Primary Obsidian plugin. Watches notes, calls Claude, writes sidecars, and renders Cytoscape inline. | MVP implementation in progress |
-| [`plugins/claude-code-plugin`](plugins/claude-code-plugin/README.md) | Optional companion for agent-curated sidecars after AI session summaries. | Scaffolded; migration pending |
+| [`plugins/claude-code-plugin`](plugins/claude-code-plugin/README.md) | Optional companion for future agent-curated sidecars. Not required for automatic extraction. | Scaffolded; migration pending |
 | [`shared/schema.json`](shared/schema.json) | JSON Schema contract for sidecar graph files. | Defined |
 | [`docs/design.md`](docs/design.md) | Living design document for open/future work. | Maintained as decisions evolve |
 
-The Obsidian plugin is the main product. The Claude Code plugin is optional:
-it can pre-populate or pin curated sidecars, but Visual Notes does not depend
-on Claude Code.
+The Obsidian plugin is the standalone product. The Claude Code companion is an
+optional adapter: it can eventually pre-populate or pin curated sidecars, but
+Visual Notes does not depend on any AI-client plugin or skill.
 
-## Architecture at a glance
+## File layout at a glance
 
 ```text
-Daily note folder
-├── 20260501.md              # source markdown
-└── 20260501-overview.json   # generated graph sidecar
+Any watched folder/
+├── note.md
+└── note-overview.json
+
+Daily folder example/
+├── 20260517.md
+└── 20260517-overview.json
+
+AI session folder example/
+└── 2026-05-17 plugin workflow/
+    ├── 2026-05-17 plugin workflow.md
+    └── 2026-05-17 plugin workflow-overview.json
 
 Obsidian plugin
 ├── settings tab             # API key, watched folders, debounce, model, Daily Context
-├── file watcher             # only watched markdown files
+├── file watcher             # configured markdown folders
 ├── extractor                # requestUrl -> Anthropic Messages API
 ├── schema validation        # Zod + shared/schema.json
 └── renderer                 # Cytoscape in MarkdownRenderChild
@@ -126,14 +207,15 @@ Obsidian plugin
 
 Important invariants:
 
-1. The `.md` note is read-only input for the plugin.
+1. The `.md` note is the source of truth for extraction.
 2. The sidecar JSON is the source of truth for rendered graph data.
 3. `_pinned: true` on a sidecar suppresses automatic re-extraction unless the
    user runs force regenerate.
 4. The renderer tolerates unsupported future sidecar kinds by showing a
    placeholder instead of crashing.
-5. Daily Context integration is optional; direct markdown extraction remains the
-   fallback when the provider is unavailable or not applicable to a note.
+5. Daily Context integration is optional and applies automatically only to
+   date-named daily notes. Other watched markdown files extract from their own
+   content, so non-daily workflows stay standalone.
 
 ## Install and setup
 
@@ -154,7 +236,8 @@ After enabling:
 
 1. Open **Settings → Visual Notes**.
 2. Paste an Anthropic API key.
-3. Add at least one watched folder, such as `Daily Notes` or `Captains Log`.
+3. Add watched folders, such as `Daily Notes`, `Captains Log`, `0 AI Sessions`,
+   or `0 Profisee/AI Sessions`.
 4. Choose a debounce and model, or keep the defaults.
 5. Save or manually extract a note with
    **Visual Notes: Extract from current note**.

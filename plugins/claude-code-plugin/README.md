@@ -1,18 +1,20 @@
 # Visual Notes — Claude Code plugin
 
-Companion plugin for the Visual Notes concept-map system. Provides:
+Optional companion plugin for the Visual Notes concept-map system. It is not the
+normal session-summary trigger. The current trigger is an AI-client
+`obsidian-notes` skill that writes an AI session summary markdown document from
+the agreed template; the Obsidian Visual Notes plugin then extracts and renders
+the visual.
 
-- A **PostToolUse hook** on `obsidian append` that nudges agents to update the
-  daily-overview visual after writing session summaries.
-- A **`visual-notes` skill** that documents the sidecar JSON schema and design
-  heuristics, so agents can produce well-structured graph data when they
-  pre-populate the sidecar.
+This companion plugin is reserved for future workflows where an agent
+deliberately curates or pins a graph sidecar instead of relying on automatic
+plugin extraction.
 
 The companion **Obsidian plugin** is the primary way to use Visual Notes (see
 [`../obsidian-plugin/README.md`](../obsidian-plugin/README.md)). This Claude Code
-plugin is **optional**: it's useful when you want agent-curated graph nodes
-for specific sessions, but the Obsidian plugin's auto-extraction handles the
-common case without it.
+plugin is **optional**: it may become useful when you want agent-curated graph
+nodes for specific sessions, but the Obsidian plugin's auto-extraction handles
+the common case without it.
 
 ## Status
 

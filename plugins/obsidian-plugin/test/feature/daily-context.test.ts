@@ -39,6 +39,7 @@ test("getDailyContextApi discovers supported Daily Context plugin API", async ()
 test("normalizeDailyContextDateFromPath supports compact and dashed daily note names", () => {
   assert.equal(normalizeDailyContextDateFromPath("0 Daily ADHD Brain Logs/20260511.md"), "2026-05-11");
   assert.equal(normalizeDailyContextDateFromPath("Captains Log/2026-05-11.md"), "2026-05-11");
+  assert.equal(normalizeDailyContextDateFromPath("0 AI Sessions/2026-05-11 planning/2026-05-11 planning.md"), null);
   assert.equal(normalizeDailyContextDateFromPath("Notes/meeting.md"), null);
 });
 

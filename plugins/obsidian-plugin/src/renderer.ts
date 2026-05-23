@@ -14,15 +14,20 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   private sidecarEventRef: EventRef | null = null;
   private readonly sidecarPath: string;
   private readonly sourcePath: string;
+  private readonly removeContainerOnUnload: boolean;
+  private readonly removeDuplicates: boolean;
 
   constructor(
     containerEl: HTMLElement,
     private readonly plugin: VisualNotesPlugin,
     sourcePath: string,
+    options: { removeContainerOnUnload?: boolean; removeDuplicates?: boolean } = {},
   ) {
     super(containerEl);
     this.sourcePath = sourcePath;
     this.sidecarPath = sidecarPathForMarkdownPath(sourcePath);
+    this.removeContainerOnUnload = options.removeContainerOnUnload ?? true;
+    this.removeDuplicates = options.removeDuplicates ?? true;
   }
 
   onload(): void {
@@ -46,7 +51,9 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     ) {
       delete previewRoot.dataset.visualNotesSourcePath;
     }
-    this.containerEl.remove();
+    if (this.removeContainerOnUnload) {
+      this.containerEl.remove();
+    }
     this.sidecarEventRef = null;
   }
 
@@ -400,6 +407,10 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   private removeDuplicateContainersForSource(): void {
+    if (!this.removeDuplicates) {
+      return;
+    }
+
     Array.from(document.querySelectorAll(".visual-notes-container")).forEach((container) => {
       if (
         container !== this.containerEl &&

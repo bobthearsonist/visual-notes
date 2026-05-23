@@ -15,7 +15,7 @@ These are the constraints future changes should not casually break:
 1. **Markdown remains the universal input.** The Obsidian plugin reacts to
    watched `.md` files and does not require a specific AI client.
 2. **The plugin does not modify note markdown.** It reads notes and writes a
-   sibling sidecar (`{date}-overview.json`) only.
+   sibling sidecar (`{note-basename}-overview.json`) only.
 3. **The sidecar is the render contract.** The renderer consumes
    `shared/schema.json`; optional producers may write the same schema.
 4. **Every edge label carries meaning.** A graph with unlabeled or generic
@@ -36,13 +36,18 @@ The Obsidian plugin has an MVP implementation:
 - sidecar writes stamped with producer/schema/hash/pin/usage metadata
 - optional `daily-context` provider support that extracts from structured daily
   sources and stamps `_sourceContext` metadata
+- `type: ai-session` notes bypass Daily Context in automatic mode so session
+  visuals are based on the session summary itself
+- explicit `visual-notes` code blocks can reserve a persistent visual slot in
+  AI session summary templates
 - inline Cytoscape rendering in Obsidian
 - status bar extraction count
 - command palette controls for extract, force-regenerate, pin, unpin, and
   delete sidecar
 
-The Claude Code plugin remains scaffolded. Its full hook/skill migration is
-future work.
+The Claude Code plugin remains scaffolded. The normal session-summary trigger
+currently lives in the external `obsidian-notes` skill; the companion plugin is
+only for future agent-curated sidecar workflows.
 
 ## Remaining design work
 
