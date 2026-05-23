@@ -6,9 +6,9 @@ const FIT_PADDING_X = 100;
 const FIT_PADDING_Y = 100;
 const COLLISION_RADIUS_X = 140;
 const COLLISION_RADIUS_Y = 70;
-const NODE_FONT_SIZE = 13;
-const MAX_X = 5000;
-const MAX_Y = 3000;
+// Matches renderer.ts node style "font-size": 11. Used by calculateLayoutMetrics
+// to estimate effective font size after cardFitScale; keep these in sync.
+const NODE_FONT_SIZE = 11;
 const SCHEMA_MIN_X = -200;
 const SCHEMA_MAX_X = 5000;
 const SCHEMA_MIN_Y = -200;

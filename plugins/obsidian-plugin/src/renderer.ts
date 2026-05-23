@@ -181,6 +181,10 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       return;
     }
 
+    // Strip any in-flight hover inline styles before reloading the stylesheet —
+    // otherwise hovered edges keep the previous theme's accent color until
+    // mouseout, creating a visible mismatch right after a theme switch.
+    this.cy.elements().removeStyle();
     this.cy.style().fromJson(this.createStyle()).update();
   }
 
