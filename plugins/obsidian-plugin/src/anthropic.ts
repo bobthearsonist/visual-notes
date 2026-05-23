@@ -13,6 +13,11 @@ export interface AnthropicErrorDetails {
   message?: string;
 }
 
+// Anthropic keys are well over 40 chars (typically ~108); this is a minimum
+// plausibility floor that catches obvious paste failures without hard-coding
+// the current length (which Anthropic may change).
+const MIN_PLAUSIBLE_KEY_LENGTH = 40;
+
 export function validateAnthropicApiKey(apiKey: string): string | null {
   const trimmed = apiKey.trim();
   if (!trimmed) {
@@ -27,7 +32,7 @@ export function validateAnthropicApiKey(apiKey: string): string | null {
     return "API key should start with sk-ant-. Check Settings -> Visual Notes.";
   }
 
-  if (trimmed.length < 40) {
+  if (trimmed.length < MIN_PLAUSIBLE_KEY_LENGTH) {
     return "API key appears incomplete. Check Settings -> Visual Notes.";
   }
 

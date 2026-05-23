@@ -9,6 +9,7 @@ import {
 test("validateAnthropicApiKey rejects missing redacted and incomplete keys before calling Anthropic", () => {
   assert.equal(validateAnthropicApiKey(""), "add your Anthropic API key in Settings.");
   assert.match(validateAnthropicApiKey("sk-ant-…work") ?? "", /redacted/u);
+  assert.match(validateAnthropicApiKey("sk-ant-...work") ?? "", /redacted/u);
   assert.match(validateAnthropicApiKey("sk-ant-short-key") ?? "", /incomplete/u);
   assert.equal(validateAnthropicApiKey("sk-ant-api03-" + "a".repeat(80)), null);
 });

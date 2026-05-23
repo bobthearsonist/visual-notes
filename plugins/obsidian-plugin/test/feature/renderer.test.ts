@@ -11,6 +11,7 @@ import { resolve } from "node:path";
 // substring checks intentionally — running `pnpm test:feature` alone (without
 // `pnpm validate`) still surfaces styling/lifecycle regressions.
 const rendererSource = readFileSync(resolve("src/renderer.ts"), "utf8");
+const mainSource = readFileSync(resolve("src/main.ts"), "utf8");
 
 describe("VisualNotesRenderChild — renderer source contract", () => {
   it("uses label-sized nodes with 11px / 500-weight text", () => {
@@ -113,6 +114,118 @@ describe("VisualNotesRenderChild — renderer source contract", () => {
       rendererSource,
       /normalizePath\(path\.replace\(\/\\\.md\$\/i, ""\) \+ "-overview\.json"\)/,
       "sidecarPathForMarkdownPath must strip .md and append -overview.json via Obsidian's normalizePath",
+    );
+  });
+});
+
+describe("VisualNotesRenderChild — render child options contract", () => {
+  it("accepts an options parameter in the constructor", () => {
+    assert.match(
+      rendererSource,
+      /options:\s*\{\s*removeContainerOnUnload\?:\s*boolean;\s*removeDuplicates\?:\s*boolean\s*\}\s*=\s*\{\}/,
+      "constructor must accept an options bag with removeContainerOnUnload and removeDuplicates",
+    );
+  });
+
+  it("defaults removeContainerOnUnload to true (legacy behavior)", () => {
+    assert.match(
+      rendererSource,
+      /this\.removeContainerOnUnload\s*=\s*options\.removeContainerOnUnload\s*\?\?\s*true/,
+      "removeContainerOnUnload must default to true to preserve legacy behavior",
+    );
+  });
+
+  it("defaults removeDuplicates to true (legacy behavior)", () => {
+    assert.match(
+      rendererSource,
+      /this\.removeDuplicates\s*=\s*options\.removeDuplicates\s*\?\?\s*true/,
+      "removeDuplicates must default to true to preserve legacy behavior",
+    );
+  });
+
+  it("gates containerEl.remove() in onunload behind removeContainerOnUnload", () => {
+    const onunloadMatch = rendererSource.match(/onunload\(\): void \{[\s\S]*?\n  \}/);
+    assert.ok(onunloadMatch, "renderer must define onunload");
+    const body = onunloadMatch[0];
+    assert.match(
+      body,
+      /if\s*\(\s*this\.removeContainerOnUnload\s*\)\s*\{[\s\S]*?this\.containerEl\.remove\(\)/,
+      "onunload must gate this.containerEl.remove() behind the removeContainerOnUnload flag",
+    );
+  });
+
+  it("early-returns from removeDuplicateContainersForSource when removeDuplicates is false", () => {
+    const fnMatch = rendererSource.match(
+      /private removeDuplicateContainersForSource\(\): void \{[\s\S]*?\n  \}/,
+    );
+    assert.ok(fnMatch, "renderer must define removeDuplicateContainersForSource");
+    const body = fnMatch[0];
+    assert.match(
+      body,
+      /if\s*\(!this\.removeDuplicates\)\s*\{\s*return;?\s*\}/,
+      "removeDuplicateContainersForSource must early-return when removeDuplicates is false",
+    );
+  });
+});
+
+describe("VisualNotesPlugin — main.ts mount strategy contract", () => {
+  it("registers a 'visual-notes' markdown codeblock processor", () => {
+    assert.match(
+      mainSource,
+      /registerMarkdownCodeBlockProcessor\(\s*"visual-notes"/,
+      "main.ts must register a markdown codeblock processor for 'visual-notes'",
+    );
+  });
+
+  it("defines mountVisualNotesCodeBlock as the codeblock mount entry point", () => {
+    assert.match(
+      mainSource,
+      /mountVisualNotesCodeBlock\s*\(/,
+      "main.ts must define mountVisualNotesCodeBlock",
+    );
+  });
+
+  it("creates VisualNotesRenderChild with removeContainerOnUnload: false and removeDuplicates: false", () => {
+    const mountMatch = mainSource.match(
+      /mountVisualNotesCodeBlock\([^)]*\):\s*void\s*\{[\s\S]*?\n  \}/,
+    );
+    assert.ok(mountMatch, "main.ts must define mountVisualNotesCodeBlock body");
+    const body = mountMatch[0];
+    assert.match(
+      body,
+      /new VisualNotesRenderChild\([\s\S]*?removeContainerOnUnload:\s*false[\s\S]*?removeDuplicates:\s*false[\s\S]*?\}\s*\)/,
+      "codeblock mount must opt out of legacy container-remove + dedupe behaviors",
+    );
+  });
+
+  it("references the codeblock host + container CSS classes", () => {
+    assert.match(
+      mainSource,
+      /visual-notes-codeblock-host/,
+      "main.ts must apply the codeblock host CSS class",
+    );
+    assert.match(
+      mainSource,
+      /visual-notes-codeblock-container/,
+      "main.ts must apply the codeblock container CSS class",
+    );
+  });
+
+  it("has removed the legacy auto-mount entry points (queueVisualNotesMount, mountVisualNotesForSource, setInterval)", () => {
+    assert.doesNotMatch(
+      mainSource,
+      /queueVisualNotesMount/,
+      "main.ts must no longer reference queueVisualNotesMount (legacy auto-mount removed)",
+    );
+    assert.doesNotMatch(
+      mainSource,
+      /mountVisualNotesForSource/,
+      "main.ts must no longer reference mountVisualNotesForSource (legacy auto-mount removed)",
+    );
+    assert.doesNotMatch(
+      mainSource,
+      /setInterval/,
+      "main.ts must no longer reference setInterval (legacy auto-mount polling removed)",
     );
   });
 });
