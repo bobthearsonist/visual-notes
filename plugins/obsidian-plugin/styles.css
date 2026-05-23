@@ -145,8 +145,14 @@
 }
 
 .visual-notes-graph {
-  height: min(70vh, 660px);
-  min-height: 560px;
+  /* Block at the top of the note, not a viewport-filling slab.
+     - clamp() = always at least 200px (graph stays legible on small windows),
+       prefers ~35% of viewport (a reasonable "block, not screen" share),
+       capped at 420px (never dominates the editor pane in source mode).
+     - No min-height: previously 560px which, combined with .markdown-source-view
+       flex layout, squeezed the .cm-editor below it to ~0 and hid the note
+       contents entirely in edit mode. See issue #24 follow-up notes. */
+  height: clamp(200px, 35vh, 420px);
   width: 100%;
 }
 
