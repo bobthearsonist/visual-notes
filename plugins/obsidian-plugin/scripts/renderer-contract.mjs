@@ -113,8 +113,8 @@ function evaluateRendererSourceContract(source) {
   if (!source.includes('"target-arrow-shape": "triangle"')) {
     contractFailures.push("renderer must keep MVP triangle arrowheads");
   }
-  if (!source.includes('"curve-style": "bezier"')) {
-    contractFailures.push("renderer must keep MVP bezier edges");
+  if (!source.includes('"curve-style": "straight"')) {
+    contractFailures.push("renderer must use straight edges (bezier renders zero-size in cytoscape 3.28 — see #21 QA)");
   }
   if (
     !source.includes('"font-size": 11') ||

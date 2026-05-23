@@ -289,8 +289,8 @@ async function evaluateRenderPersistence() {
   if (rendererSource.includes("story-card") || /data:\s*\{[^}]*parent:/s.test(rendererSource)) {
     persistenceFailures.push("renderer must not synthesize compound story-card parents");
   }
-  if (!rendererSource.includes('"curve-style": "bezier"')) {
-    persistenceFailures.push("renderer must use hook-style bezier edges for preset sidecar coordinates");
+  if (!rendererSource.includes('"curve-style": "straight"')) {
+    persistenceFailures.push("renderer must use straight edges (bezier renders as zero-size in cytoscape 3.28 — see #21 QA finding)");
   }
   if (!rendererSource.includes("layout: { name: \"preset\", fit: false }")) {
     persistenceFailures.push("renderer must use preset layout without recalculating sidecar positions");
