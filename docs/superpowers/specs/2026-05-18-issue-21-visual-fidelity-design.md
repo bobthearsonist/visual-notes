@@ -67,10 +67,12 @@ Nodes size to label content. Long labels grow; short labels stay compact. `text-
 + "text-background-opacity": 0.92,
 + "text-background-padding": "4px",
 - width: 2,
-+ width: 4,
++ width: 2.5,
+- "curve-style": "bezier",
++ "curve-style": "straight",
 ```
 
-Edge labels stop shouting. Edge width bumps to 4 matching legacy (with `strong-edge: 5`, `weak-edge: 3`).
+Edge labels stop shouting. Edge widths become `2.5 / 3.5 / 1.5` (base / strong / weak) — lighter than the legacy template's `4 / 5 / 3` after a QA pass revealed those felt overweight against label-sized nodes at typical zoom. `curve-style` switches from `bezier` to `straight` because cytoscape 3.28.1 renders bezier edges as zero-size bounding boxes in our setup (confirmed via DOM inspection in Obsidian; see also QA notes in the PR description). Both QA-discovered values land in the final commit of the PR rather than the initial styling commits.
 
 ### Cytoscape init
 

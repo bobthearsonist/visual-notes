@@ -36,7 +36,11 @@ const qualityGate = {
   maxWeakEdgeLengthBudget: 2400,
   maxComponentWidth: 1500,
   maxComponentHeight: 800,
-  minEstimatedDefaultNodeFontPx: 8,
+  // Threshold scaled with NODE_FONT_SIZE = 11 (#21 fixed stale 13).
+  // estimatedDefaultNodeFontPx = NODE_FONT_SIZE * min(cardFitScale, 1);
+  // narrative fixture's cardFitScale ≈ 0.67 ⇒ ≈ 7.4px effective.
+  // Floor of 7 catches truly cramped renders without over-rejecting normal data.
+  minEstimatedDefaultNodeFontPx: 7,
 };
 
 const narrativeOverviewPath = new URL(
