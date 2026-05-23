@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { getSharedRendererSourceFailures } from "./shared-renderer-assertions.mjs";
 
 const pluginRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -273,14 +274,8 @@ function evaluateEmptyGraph() {
 async function evaluateRenderPersistence() {
   const rendererSource = await readFile(new URL("../src/renderer.ts", import.meta.url), "utf8");
   const mainSource = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
-  const persistenceFailures = [];
+  const persistenceFailures = [...getSharedRendererSourceFailures(rendererSource)];
 
-  if (rendererSource.includes("applyDeterministicLayout")) {
-    persistenceFailures.push("renderer must not import or call applyDeterministicLayout");
-  }
-  if (!rendererSource.includes("this.renderGraph(sidecar);")) {
-    persistenceFailures.push("renderer must pass parsed sidecar positions directly into renderGraph");
-  }
   const nodeElementIndex = rendererSource.indexOf("...sidecar.nodes.map");
   const edgeElementIndex = rendererSource.indexOf("...sidecar.edges.map");
 
@@ -292,9 +287,6 @@ async function evaluateRenderPersistence() {
   }
   if (rendererSource.includes("story-card") || /data:\s*\{[^}]*parent:/s.test(rendererSource)) {
     persistenceFailures.push("renderer must not synthesize compound story-card parents");
-  }
-  if (!rendererSource.includes('"curve-style": "straight"')) {
-    persistenceFailures.push("renderer must use straight edges (bezier renders as zero-size in cytoscape 3.28 — see #21 QA finding)");
   }
   if (!rendererSource.includes("layout: { name: \"preset\", fit: false }")) {
     persistenceFailures.push("renderer must use preset layout without recalculating sidecar positions");

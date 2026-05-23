@@ -111,6 +111,13 @@ function assignMissingPositions(nodes: VisualNotesNode[]): VisualNotesNode[] {
 }
 
 function isMissingPosition(position: { x: number; y: number }): boolean {
+  // (0, 0) is the sentinel for "no position assigned by the LLM" because the
+  // extraction prompt teaches Claude to place nodes in cluster columns at
+  // x ≥ 0 and status tiers at y ≥ 80; a legitimate (0, 0) is implausible
+  // from a model that follows the prompt. SCHEMA_MIN_X/Y = -200 technically
+  // permits (0, 0) as a valid position — accepted footgun, mitigated by the
+  // prompt. If this becomes wrong in practice, switch to an explicit
+  // optional `position` field in the schema.
   return position.x === 0 && position.y === 0;
 }
 
@@ -126,8 +133,13 @@ function findFreeSlot(
   cursor: number,
   placed: VisualNotesNode[],
 ): { x: number; y: number } {
-  // Spiral outwards from the anchor in COLLISION_RADIUS_X increments
-  // until we find a slot the collision pass would accept.
+  // Spiral outwards from the anchor in COLLISION_RADIUS_X increments until
+  // we find a slot the collision pass would accept. Capped at radius 5
+  // (≈121 candidate slots: 1 center + 8 + 16 + 24 + 32 + 40). For sidecars
+  // with more than ~121 missing-position nodes — implausibly large for a
+  // daily overview but possible from a malformed extraction — overflow
+  // falls back to the anchor position and resolveCollisions handles the
+  // pileup downstream.
   const radii = [0, 1, 2, 3, 4, 5];
   for (const radius of radii) {
     const candidates = ringCandidates(anchor, radius);
@@ -198,6 +210,13 @@ function resolveCollisions(nodes: VisualNotesNode[]): VisualNotesNode[] {
   for (const node of nodes) {
     let position = { ...node.position };
 
+    // Bound to 12 nudge attempts: in practice 1-2 nudges resolve a typical
+    // overlap; the ceiling defends against pathological inputs (e.g. >12
+    // nodes piled at the same coordinate from a malformed extraction) so
+    // the pipeline can't hang on a single graph. If exhausted, the node
+    // stays where the last nudge left it — still in-bounds (clamped each
+    // step) but possibly still colliding. Acceptable failure mode: a few
+    // overlapping nodes vs an infinite loop blocking render.
     let attempts = 0;
     while (attempts < 12 && hasCollision(position, repaired)) {
       position = nudgeAway(position, repaired);
