@@ -112,20 +112,20 @@ function evaluateRendererSourceContract(source) {
     !source.includes('"font-size": 11') ||
     !source.includes('"font-weight": 500')
   ) {
-    contractFailures.push("renderer must keep readable compact 11px/500-weight nodes (#21)");
+    contractFailures.push("renderer must keep readable compact 11px/500-weight nodes");
   }
   if (!source.includes('width: "label"') || !source.includes('height: "label"')) {
-    contractFailures.push("nodes must be label-sized (width/height: 'label') (#21)");
+    contractFailures.push("nodes must be label-sized (width/height: 'label')");
   }
   if (
     !source.includes('"font-size": 11') ||
     !source.includes('"font-weight": "normal"') ||
     !source.includes('"arrow-scale": 1.1')
   ) {
-    contractFailures.push("renderer must keep 11px normal-weight edge labels and 1.1 arrow scale (#21)");
+    contractFailures.push("renderer must keep 11px normal-weight edge labels and 1.1 arrow scale");
   }
   if (!source.includes('"text-background-opacity": 0.92') || !source.includes('"text-background-padding": "4px"')) {
-    contractFailures.push("edge labels must keep a 92% opacity halo with 4px padding (#21)");
+    contractFailures.push("edge labels must keep a 92% opacity halo with 4px padding");
   }
   if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(source)) {
     contractFailures.push("weak edge labels must not be faded by edge opacity");
@@ -143,7 +143,7 @@ function evaluateRendererSourceContract(source) {
     contractFailures.push("renderer must allow narrow-pane fitting with minZoom 0.1");
   }
   if (!source.includes("wheelSensitivity: 0.3")) {
-    contractFailures.push("renderer must keep wheelSensitivity 0.3 for smooth zoom (#21)");
+    contractFailures.push("renderer must keep wheelSensitivity 0.3 for smooth zoom");
   }
   if (!source.includes("bindHoverInteractions") || !source.includes('cy.on("mouseover"')) {
     contractFailures.push("renderer must bind hover handlers for edge highlighting");

@@ -136,10 +136,10 @@ fetch('2026-05-18-today-data.json')
         { selector: 'node.task',      style: { shape: 'ellipse' }},
         { selector: 'node.decision',  style: { shape: 'diamond', padding: '16px' }},
         { selector: 'edge', style: {
-          width: 4,
+          width: 2.5,
           'line-color': '#8c8fa1', 'target-arrow-color': '#8c8fa1',
           'target-arrow-shape': 'triangle', 'arrow-scale': 1.1,
-          'curve-style': 'bezier',
+          'curve-style': 'straight',
           color: '#a6adc8', label: 'data(displayLabel)',
           'font-size': 11, 'font-family': 'sans-serif',
           'font-weight': 'normal',
@@ -148,8 +148,8 @@ fetch('2026-05-18-today-data.json')
           'text-background-padding': '4px',
           'z-index': 1
         }},
-        { selector: 'edge.strong-edge', style: { width: 5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
-        { selector: 'edge.weak-edge',   style: { width: 3, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
+        { selector: 'edge.strong-edge', style: { width: 3.5, 'line-color': '#cdd6f4', 'target-arrow-color': '#cdd6f4' }},
+        { selector: 'edge.weak-edge',   style: { width: 1.5, 'line-style': 'dashed', 'line-color': '#bcc0cc', 'target-arrow-color': '#bcc0cc' }}
       ]
     });
 

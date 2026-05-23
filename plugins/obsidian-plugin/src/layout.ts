@@ -6,8 +6,8 @@ const FIT_PADDING_X = 100;
 const FIT_PADDING_Y = 100;
 const COLLISION_RADIUS_X = 140;
 const COLLISION_RADIUS_Y = 70;
-// Matches renderer.ts node style "font-size": 11. Used by calculateLayoutMetrics
-// to estimate effective font size after cardFitScale; keep these in sync.
+// Keep in sync with renderer.ts node style "font-size". Used by
+// calculateLayoutMetrics to estimate effective font size after cardFitScale.
 const NODE_FONT_SIZE = 11;
 const SCHEMA_MIN_X = -200;
 const SCHEMA_MAX_X = 5000;
@@ -111,13 +111,11 @@ function assignMissingPositions(nodes: VisualNotesNode[]): VisualNotesNode[] {
 }
 
 function isMissingPosition(position: { x: number; y: number }): boolean {
-  // (0, 0) is the sentinel for "no position assigned by the LLM" because the
-  // extraction prompt teaches Claude to place nodes in cluster columns at
-  // x ≥ 0 and status tiers at y ≥ 80; a legitimate (0, 0) is implausible
-  // from a model that follows the prompt. SCHEMA_MIN_X/Y = -200 technically
-  // permits (0, 0) as a valid position — accepted footgun, mitigated by the
-  // prompt. If this becomes wrong in practice, switch to an explicit
-  // optional `position` field in the schema.
+  // (0, 0) is the sentinel for "no position assigned" — the extraction
+  // prompt teaches Claude to place nodes at x ≥ 0 and y ≥ 80, so a real
+  // origin position is implausible. Schema bounds technically permit it;
+  // if that becomes a problem in practice, replace with an optional
+  // `position` field.
   return position.x === 0 && position.y === 0;
 }
 
@@ -133,13 +131,10 @@ function findFreeSlot(
   cursor: number,
   placed: VisualNotesNode[],
 ): { x: number; y: number } {
-  // Spiral outwards from the anchor in COLLISION_RADIUS_X increments until
-  // we find a slot the collision pass would accept. Capped at radius 5
-  // (≈121 candidate slots: 1 center + 8 + 16 + 24 + 32 + 40). For sidecars
-  // with more than ~121 missing-position nodes — implausibly large for a
-  // daily overview but possible from a malformed extraction — overflow
-  // falls back to the anchor position and resolveCollisions handles the
-  // pileup downstream.
+  // Spiral outward in COLLISION_RADIUS_X increments until we find a slot
+  // the collision pass would accept. Capped at radius 5 (~121 candidate
+  // slots); on overflow we drop on the anchor and resolveCollisions
+  // handles any pileup.
   const radii = [0, 1, 2, 3, 4, 5];
   for (const radius of radii) {
     const candidates = ringCandidates(anchor, radius);
@@ -210,13 +205,10 @@ function resolveCollisions(nodes: VisualNotesNode[]): VisualNotesNode[] {
   for (const node of nodes) {
     let position = { ...node.position };
 
-    // Bound to 12 nudge attempts: in practice 1-2 nudges resolve a typical
-    // overlap; the ceiling defends against pathological inputs (e.g. >12
-    // nodes piled at the same coordinate from a malformed extraction) so
-    // the pipeline can't hang on a single graph. If exhausted, the node
-    // stays where the last nudge left it — still in-bounds (clamped each
-    // step) but possibly still colliding. Acceptable failure mode: a few
-    // overlapping nodes vs an infinite loop blocking render.
+    // Bound to 12 attempts: 1-2 nudges usually resolve a typical overlap;
+    // the ceiling defends against pathological inputs (many nodes piled
+    // at the same coordinate). On exhaustion the node stays in-bounds
+    // but possibly still overlapping — preferable to an infinite loop.
     let attempts = 0;
     while (attempts < 12 && hasCollision(position, repaired)) {
       position = nudgeAway(position, repaired);
@@ -273,10 +265,10 @@ function nudgeAway(
   return { x: position.x, y: colliding.position.y + chooseAxisOffset(dy, COLLISION_RADIUS_Y, colliding.position.y, SCHEMA_MIN_Y, SCHEMA_MAX_Y) };
 }
 
-// Choose ±radius for a nudge so the result stays inside [min, max]. Without
-// this, a collision at SCHEMA_MAX_X (or _MIN_X) gets nudged further out of
-// bounds, the caller clamps it back to the edge, and the collision never
-// clears — loop exhausts with overlap. Codex caught this on PR #23.
+// Choose ±radius for a nudge so the result stays inside [min, max].
+// Without this, a collision at the schema's edge gets nudged further out
+// of bounds, the caller clamps it back to the edge, and the collision
+// never clears.
 function chooseAxisOffset(
   delta: number,
   radius: number,
@@ -409,8 +401,8 @@ function buildInfoById(
 }
 
 // Retained for calculateLayoutMetrics' component stats. The repair pass
-// added in #21 does not lay out by component; this function is only
-// reached through metrics calculation.
+// no longer lays out by component; this function is only reached
+// through metrics calculation.
 function buildVisualComponents(
   nodes: VisualNotesNode[],
   edges: VisualNotesEdge[],

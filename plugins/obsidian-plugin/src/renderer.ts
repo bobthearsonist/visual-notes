@@ -181,9 +181,9 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       return;
     }
 
-    // Strip any in-flight hover inline styles before reloading the stylesheet —
-    // otherwise hovered edges keep the previous theme's accent color until
-    // mouseout, creating a visible mismatch right after a theme switch.
+    // Strip any in-flight hover inline styles before reloading the
+    // stylesheet — otherwise hovered edges keep the previous theme's
+    // accent color until the next mouseout.
     this.cy.elements().removeStyle();
     this.cy.style().fromJson(this.createStyle()).update();
   }
@@ -224,13 +224,10 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
 
   private createStyle(): cytoscape.StylesheetJson {
     const computed = getComputedStyle(this.containerEl);
-    // theme.muted is used for edge label text color (#21 styling pass moved
-    // edge labels from theme.nodeText/near-black to theme.muted so labels
-    // de-emphasize against bolder node fills). Obsidian defines --text-muted
-    // in both light and dark themes — Catppuccin Latte (light) gives ~#5c5f77,
-    // Mocha (dark) gives ~#a6adc8 — both legible against their respective
-    // --background-primary surfaces. Fallback #a6adc8 is dark-theme-shaped
-    // and only triggers in non-Obsidian dev contexts.
+    // theme.muted is the edge label color — intentionally de-emphasized
+    // against bolder node fills. Obsidian's --text-muted is legible against
+    // --background-primary in both light and dark themes; the hardcoded
+    // fallback only triggers in non-Obsidian dev contexts.
     const theme = {
       muted: getCssVariable(computed, "--text-muted", "#a6adc8"),
       background: getCssVariable(computed, "--background-primary", "#1e1e2e"),
@@ -346,13 +343,15 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   private bindHoverInteractions(): void {
     if (!this.cy) return;
 
-    const highlight = getCssVariable(
-      getComputedStyle(this.containerEl),
-      "--interactive-accent",
-      "#2563eb",
-    );
-
+    // Read --interactive-accent inside the mouseover handler (not once at
+    // bind time) so the next hover after a theme switch picks up the new
+    // accent without needing to rebind handlers from applyTheme().
     this.cy.on("mouseover", "node", (evt) => {
+      const highlight = getCssVariable(
+        getComputedStyle(this.containerEl),
+        "--interactive-accent",
+        "#2563eb",
+      );
       evt.target.style("border-width", 4);
       evt.target.connectedEdges().style({
         "line-color": highlight,

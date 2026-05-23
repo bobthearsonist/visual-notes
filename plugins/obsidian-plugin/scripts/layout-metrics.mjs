@@ -37,10 +37,9 @@ const qualityGate = {
   maxWeakEdgeLengthBudget: 2400,
   maxComponentWidth: 1500,
   maxComponentHeight: 800,
-  // Threshold scaled with NODE_FONT_SIZE = 11 (#21 fixed stale 13).
-  // estimatedDefaultNodeFontPx = NODE_FONT_SIZE * min(cardFitScale, 1);
-  // narrative fixture's cardFitScale ≈ 0.67 ⇒ ≈ 7.4px effective.
-  // Floor of 7 catches truly cramped renders without over-rejecting normal data.
+  // estimatedDefaultNodeFontPx = NODE_FONT_SIZE * min(cardFitScale, 1).
+  // Narrative fixture's cardFitScale ≈ 0.67 gives ≈ 7.4px effective.
+  // Floor of 7 catches truly cramped renders without rejecting normal data.
   minEstimatedDefaultNodeFontPx: 7,
 };
 
@@ -303,17 +302,17 @@ async function evaluateRenderPersistence() {
     !rendererSource.includes('width: "label"') ||
     !rendererSource.includes('height: "label"')
   ) {
-    persistenceFailures.push("renderer node sizing should use label-sized 11px/500-weight nodes (#21)");
+    persistenceFailures.push("renderer node sizing should use label-sized 11px/500-weight nodes");
   }
   if (
     !rendererSource.includes('"font-size": 11') ||
     !rendererSource.includes('"font-weight": "normal"') ||
     !rendererSource.includes('"arrow-scale": 1.1')
   ) {
-    persistenceFailures.push("renderer edge labels should be readable while keeping hook-style arrow scale (#21)");
+    persistenceFailures.push("renderer edge labels should be readable while keeping hook-style arrow scale");
   }
   if (!rendererSource.includes('"text-background-opacity": 0.92') || !rendererSource.includes('"text-background-padding": "4px"')) {
-    persistenceFailures.push("renderer edge labels should keep a readable background halo (#21)");
+    persistenceFailures.push("renderer edge labels should keep a readable background halo");
   }
   if (/selector:\s*"edge\.weak-edge"[\s\S]*opacity:/.test(rendererSource)) {
     persistenceFailures.push("renderer weak edge labels must not be faded by edge opacity");

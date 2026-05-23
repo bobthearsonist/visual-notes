@@ -22,7 +22,7 @@ export function getSharedRendererSourceFailures(source) {
     failures.push("renderer must pass parsed sidecar positions directly into renderGraph");
   }
   if (!source.includes('"curve-style": "straight"')) {
-    failures.push("renderer must use straight edges (bezier renders zero-size in cytoscape 3.28 — see #21 QA)");
+    failures.push("renderer must use straight edges (bezier renders zero-size in cytoscape 3.28)");
   }
 
   return failures;
