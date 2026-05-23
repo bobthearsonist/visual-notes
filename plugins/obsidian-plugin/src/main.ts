@@ -1,7 +1,6 @@
 import {
   debounce,
   Events,
-  MarkdownView,
   Notice,
   Plugin,
   TFile,
@@ -42,10 +41,7 @@ import { addExtractionUsage } from "./usage";
 const PRODUCER_ID = "obsidian-plugin@0.1.0";
 const MAX_INPUT_TOKENS = 100_000;
 const FORCE_REGENERATE_COOLDOWN_MS = 30_000;
-const MOUNT_RETRY_LIMIT = 30;
-const MOUNT_RETRY_DELAY_MS = 100;
 
-type VisualNotesViewMode = "preview" | "source";
 type ExtractionSourceMode = "auto" | "daily-context";
 
 interface ExtractionOptions {
@@ -71,10 +67,6 @@ export default class VisualNotesPlugin extends Plugin {
   private readonly forceRegenerateCooldowns = new Map<string, number>();
   private readonly activeExtractionPaths = new Set<string>();
   private readonly pendingExtractionPaths = new Set<string>();
-  private readonly pendingMountSourcePaths = new Set<string>();
-  private activeRenderChild: VisualNotesRenderChild | null = null;
-  private activeRenderSourcePath: string | null = null;
-  private activeRenderMode: VisualNotesViewMode | null = null;
   private statusBarEl: HTMLElement | null = null;
   private activeExtractions = 0;
 
@@ -94,29 +86,6 @@ export default class VisualNotesPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor("visual-notes", (_source, el, ctx) => {
       this.mountVisualNotesCodeBlock(el, ctx);
     });
-    this.registerMarkdownPostProcessor((el, ctx) => {
-      if (!ctx.sourcePath.endsWith(".md")) {
-        return;
-      }
-
-      const renderedBlocks = Array.from(el.querySelectorAll(".block-language-visual-notes")).filter(
-        (block): block is HTMLElement => block instanceof HTMLElement,
-      );
-      const visualBlocks =
-        renderedBlocks.length > 0
-          ? renderedBlocks
-          : Array.from(
-              el.querySelectorAll(".cm-lang-visual-notes, pre > code.language-visual-notes, code.language-visual-notes"),
-            ).filter((block): block is HTMLElement => block instanceof HTMLElement);
-      if (visualBlocks.length > 0) {
-        visualBlocks.forEach((block) => {
-          this.mountVisualNotesCodeBlock(block, ctx);
-        });
-        return;
-      }
-
-      this.queueVisualNotesMount(ctx.sourcePath);
-    });
 
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
@@ -125,37 +94,6 @@ export default class VisualNotesPlugin extends Plugin {
         }
       }),
     );
-
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", (leaf) => {
-        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
-          this.queueVisualNotesMount(leaf.view.file.path);
-          return;
-        }
-
-        this.clearActiveRenderChild();
-      }),
-    );
-
-    this.registerEvent(
-      this.app.workspace.on("file-open", (file) => {
-        if (file instanceof TFile && file.extension === "md") {
-          this.queueVisualNotesMount(file.path);
-          return;
-        }
-
-        this.clearActiveRenderChild();
-      }),
-    );
-
-    this.registerEvent(
-      this.app.workspace.on("layout-change", () => {
-        this.queueActiveVisualNotesMount();
-      }),
-    );
-    this.registerInterval(window.setInterval(() => this.queueActiveVisualNotesMount(), 1_000));
-
-    window.setTimeout(() => this.queueActiveVisualNotesMount(), 0);
   }
 
   private mountVisualNotesCodeBlock(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
@@ -189,8 +127,6 @@ export default class VisualNotesPlugin extends Plugin {
   onunload(): void {
     this.debounceTimers.forEach((timer) => timer.cancel());
     this.debounceTimers.clear();
-    this.pendingMountSourcePaths.clear();
-    this.clearActiveRenderChild();
   }
 
   async loadSettings(): Promise<void> {
@@ -274,143 +210,6 @@ export default class VisualNotesPlugin extends Plugin {
         this.deleteSidecar(file),
       ),
     });
-  }
-
-  private queueActiveVisualNotesMount(): void {
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!(activeFile instanceof TFile) || activeFile.extension !== "md") {
-      this.clearActiveRenderChild();
-      return;
-    }
-
-    this.queueVisualNotesMount(activeFile.path);
-  }
-
-  private queueVisualNotesMount(sourcePath: string): void {
-    if (!sourcePath.endsWith(".md")) {
-      return;
-    }
-
-    if (this.pendingMountSourcePaths.has(sourcePath)) {
-      return;
-    }
-
-    this.pendingMountSourcePaths.add(sourcePath);
-    window.setTimeout(() => {
-      this.pendingMountSourcePaths.delete(sourcePath);
-      void this.mountVisualNotesForSource(sourcePath);
-    }, 0);
-  }
-
-  private async mountVisualNotesForSource(sourcePath: string, attempt = 0): Promise<void> {
-    if (await this.sourceHasExplicitVisualNotesBlock(sourcePath)) {
-      this.clearActiveRenderChild();
-      return;
-    }
-
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!(activeFile instanceof TFile) || activeFile.path !== sourcePath) {
-      return;
-    }
-
-    const leaf = this.getMarkdownLeafForPath(sourcePath);
-    if (!leaf || !(leaf.view instanceof MarkdownView)) {
-      return;
-    }
-
-    const mode = leaf.view.getMode() === "source" ? "source" : "preview";
-    const mountTarget = mode === "source" ? findSourceMountTarget(leaf.view) : findPreviewMountTarget(leaf.view);
-
-    if (!(mountTarget instanceof HTMLElement)) {
-      if (attempt < MOUNT_RETRY_LIMIT) {
-        window.setTimeout(
-          () => void this.mountVisualNotesForSource(sourcePath, attempt + 1),
-          MOUNT_RETRY_DELAY_MS,
-        );
-      }
-      return;
-    }
-
-    if (
-      this.activeRenderChild &&
-      this.activeRenderSourcePath === sourcePath &&
-      this.activeRenderMode === mode &&
-      this.activeRenderChild.containerEl.parentElement === mountTarget
-    ) {
-      return;
-    }
-
-    if (mode === "preview" && this.hasCodeblockContainerForSource(sourcePath)) {
-      this.clearActiveRenderChild();
-      return;
-    }
-
-    this.clearActiveRenderChild();
-
-    document
-      .querySelectorAll(`.visual-notes-container[data-visual-notes-source-path="${cssEscape(sourcePath)}"]`)
-      .forEach((container) => container.remove());
-
-    const container = document.createElement("div");
-    container.classList.add("visual-notes-container", `visual-notes-${mode}-container`);
-    container.dataset.visualNotesSourcePath = sourcePath;
-
-    if (mode === "source") {
-      const editor = mountTarget.querySelector(".cm-editor");
-      mountTarget.insertBefore(container, editor ?? mountTarget.firstChild);
-    } else {
-      const insertionTarget = findFrontmatterBoundary(mountTarget);
-      if (insertionTarget?.nextSibling) {
-        mountTarget.insertBefore(container, insertionTarget.nextSibling);
-      } else if (insertionTarget) {
-        mountTarget.appendChild(container);
-      } else {
-        mountTarget.prepend(container);
-      }
-    }
-
-    const child = new VisualNotesRenderChild(container, this, sourcePath);
-    this.addChild(child);
-    this.activeRenderChild = child;
-    this.activeRenderSourcePath = sourcePath;
-    this.activeRenderMode = mode;
-  }
-
-  private getMarkdownLeafForPath(sourcePath: string) {
-    return this.app.workspace
-      .getLeavesOfType("markdown")
-      .find((candidate) => {
-        const view = candidate.view;
-        return view instanceof MarkdownView && view.file?.path === sourcePath;
-      });
-  }
-
-  private clearActiveRenderChild(): void {
-    if (this.activeRenderChild) {
-      this.removeChild(this.activeRenderChild);
-    }
-
-    this.activeRenderChild = null;
-    this.activeRenderSourcePath = null;
-    this.activeRenderMode = null;
-  }
-
-  private hasCodeblockContainerForSource(sourcePath: string): boolean {
-    return (
-      document.querySelector(
-        `.visual-notes-codeblock-container[data-visual-notes-source-path="${cssEscape(sourcePath)}"]`,
-      ) !== null
-    );
-  }
-
-  private async sourceHasExplicitVisualNotesBlock(sourcePath: string): Promise<boolean> {
-    const file = this.app.vault.getAbstractFileByPath(sourcePath);
-    if (!(file instanceof TFile)) {
-      return false;
-    }
-
-    const markdown = await this.app.vault.read(file);
-    return /```visual-notes(?:\s|$)/u.test(markdown);
   }
 
   private withActiveMarkdownFile(
@@ -596,7 +395,6 @@ export default class VisualNotesPlugin extends Plugin {
 
       await this.app.vault.adapter.write(sidecarPath, `${JSON.stringify(stamped, null, 2)}\n`);
       this.sidecarEvents.trigger("changed", sidecarPath);
-      this.queueVisualNotesMount(file.path);
 
       const shouldShowFirstRunNotice = !this.settings.firstRunNoticeShown;
       if (shouldShowFirstRunNotice) {
@@ -900,32 +698,3 @@ function appendExtractionHistory(
   return [...(existingSidecar?._extractionHistory ?? []), entry].slice(-10);
 }
 
-function findPreviewMountTarget(view: MarkdownView): HTMLElement | null {
-  const section = view.containerEl.querySelector(
-    ".markdown-reading-view > .markdown-preview-view > .markdown-preview-sizer.markdown-preview-section",
-  );
-  return section instanceof HTMLElement ? section : null;
-}
-
-function findSourceMountTarget(view: MarkdownView): HTMLElement | null {
-  const sourceView = view.containerEl.querySelector(".markdown-source-view");
-  return sourceView instanceof HTMLElement ? sourceView : null;
-}
-
-function findFrontmatterBoundary(section: HTMLElement): Element | null {
-  const directChildren = Array.from(section.children);
-  const frontmatter = directChildren.find((child) =>
-    child.classList.contains("mod-header") ||
-    child.classList.contains("mod-frontmatter") ||
-    child.querySelector(".metadata-container") !== null,
-  );
-  if (frontmatter) {
-    return frontmatter;
-  }
-
-  return directChildren.find((child) => child.classList.contains("markdown-preview-pusher")) ?? null;
-}
-
-function cssEscape(value: string): string {
-  return value.replace(/["\\]/g, "\\$&");
-}
