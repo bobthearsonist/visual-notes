@@ -43,6 +43,21 @@ test("normalizeDailyContextDateFromPath supports compact and dashed daily note n
   assert.equal(normalizeDailyContextDateFromPath("Notes/meeting.md"), null);
 });
 
+test("normalizeDailyContextDateFromPath only matches strict basenames, never date patterns in folders", () => {
+  // Strict basename matches → return normalized date
+  assert.equal(normalizeDailyContextDateFromPath("2026-05-23.md"), "2026-05-23");
+  assert.equal(normalizeDailyContextDateFromPath("20260523.md"), "2026-05-23");
+
+  // Date is in a folder segment, not the basename → must return null
+  assert.equal(normalizeDailyContextDateFromPath("Daily/2026-05-23/notes.md"), null);
+
+  // No date at all → null
+  assert.equal(normalizeDailyContextDateFromPath("randomly-named.md"), null);
+
+  // Non-zero-padded single-digit month/day → null (must be strict 2-digit)
+  assert.equal(normalizeDailyContextDateFromPath("2026-5-23.md"), null);
+});
+
 test("buildDailyContextExtractionInput creates deterministic source sections and metadata", () => {
   const extraction = buildDailyContextExtractionInput(
     dailyContext({

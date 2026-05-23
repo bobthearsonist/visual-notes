@@ -107,18 +107,18 @@ export default class VisualNotesPlugin extends Plugin {
     }
 
     try {
-      el.replaceChildren();
-      el.classList.add("visual-notes-codeblock-host");
       const container = document.createElement("div");
-      container.className = "visual-notes-container visual-notes-codeblock-container";
+      container.classList.add("visual-notes-container", "visual-notes-codeblock-container");
       container.dataset.visualNotesSourcePath = ctx.sourcePath;
-      el.appendChild(container);
-      ctx.addChild(
-        new VisualNotesRenderChild(container, this, ctx.sourcePath, {
-          removeContainerOnUnload: false,
-          removeDuplicates: false,
-        }),
-      );
+      // Build the render child BEFORE we mutate `el`, so a constructor failure
+      // doesn't leave the codeblock wiped.
+      const child = new VisualNotesRenderChild(container, this, ctx.sourcePath, {
+        removeContainerOnUnload: false,
+        removeDuplicates: false,
+      });
+      el.replaceChildren(container);
+      el.classList.add("visual-notes-codeblock-host");
+      ctx.addChild(child);
     } catch (error) {
       this.log("error", "Failed to mount visual-notes code block.", { sourcePath: ctx.sourcePath, error });
     }
