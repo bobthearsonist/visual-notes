@@ -291,12 +291,12 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       {
         selector: "edge",
         style: {
-          width: 4,
+          width: 2.5,
           "line-color": theme.edge,
           "target-arrow-color": theme.edge,
           "target-arrow-shape": "triangle",
           "arrow-scale": 1.1,
-          "curve-style": "bezier",
+          "curve-style": "straight",
           color: theme.muted,
           label: "data(displayLabel)",
           "font-size": 11,
@@ -313,7 +313,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       {
         selector: "edge.strong-edge",
         style: {
-          width: 5,
+          width: 3.5,
           "line-color": theme.strong,
           "target-arrow-color": theme.strong,
         },
@@ -321,7 +321,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       {
         selector: "edge.weak-edge",
         style: {
-          width: 3,
+          width: 1.5,
           "line-style": "dashed",
           "line-color": theme.weak,
           "target-arrow-color": theme.weak,
