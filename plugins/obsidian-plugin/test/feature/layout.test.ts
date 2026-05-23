@@ -97,6 +97,36 @@ describe("applyDeterministicLayout — repair pass", () => {
     assert.deepEqual(anchor.position, { x: 500, y: 400 }, "anchor untouched");
   });
 
+  it("resolves boundary collision by pushing inward (Codex P1 #23 regression)", () => {
+    // Two nodes whose raw positions are off-canvas to the right. After
+    // clampOffCanvas both land at x=SCHEMA_MAX_X=5000, colliding. The naive
+    // nudge would push the second node further right (+140), then the clamp
+    // pulls it back to 5000, and the collision never clears. The fix:
+    // detect that the preferred-direction nudge would exceed the schema bound
+    // and flip the sign so the second node moves inward.
+    const sidecar = makeSidecar([
+      { id: "edge-a", classes: "system context", position: { x: 6000, y: 100 } },
+      { id: "edge-b", classes: "system context", position: { x: 7000, y: 100 } },
+    ]);
+
+    const result = applyDeterministicLayout(sidecar);
+    const a = result.nodes.find((n) => n.data.id === "edge-a")!;
+    const b = result.nodes.find((n) => n.data.id === "edge-b")!;
+
+    // Both must end up in-bounds.
+    assert.ok(
+      a.position.x <= SCHEMA_MAX_X_BOUND && b.position.x <= SCHEMA_MAX_X_BOUND,
+      `both nodes should be in-bounds; got a.x=${a.position.x}, b.x=${b.position.x}`,
+    );
+    // And they must NOT overlap.
+    const dx = Math.abs(a.position.x - b.position.x);
+    const dy = Math.abs(a.position.y - b.position.y);
+    assert.ok(
+      dx >= 140 || dy >= 70,
+      `boundary collision must resolve to clear separation; got dx=${dx}, dy=${dy}`,
+    );
+  });
+
   it("assigns a visible position to a node with missing coordinates", () => {
     const sidecar = makeSidecar([
       { id: "placed-a", classes: "system context", position: { x: 200, y: 200 } },
