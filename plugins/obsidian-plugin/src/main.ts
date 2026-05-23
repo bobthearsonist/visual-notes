@@ -101,17 +101,10 @@ export default class VisualNotesPlugin extends Plugin {
       return;
     }
 
-    const existingContainer = el.querySelector(".visual-notes-codeblock-container");
-    if (existingContainer instanceof HTMLElement) {
-      return;
-    }
-
     try {
       const container = document.createElement("div");
       container.classList.add("visual-notes-container", "visual-notes-codeblock-container");
       container.dataset.visualNotesSourcePath = ctx.sourcePath;
-      // Build the render child BEFORE we mutate `el`, so a constructor failure
-      // doesn't leave the codeblock wiped.
       const child = new VisualNotesRenderChild(container, this, ctx.sourcePath, {
         removeContainerOnUnload: false,
         removeDuplicates: false,

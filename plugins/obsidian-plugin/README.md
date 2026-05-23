@@ -95,8 +95,8 @@ sequenceDiagram
     Plugin->>API: requestUrl /v1/messages
     API-->>Plugin: structured JSON (Zod-validated)
     Plugin->>Obsidian: write {note-basename}-overview.json
-    Obsidian->>Plugin: trigger MarkdownPostProcessor
-    Plugin->>User: render Cytoscape inline or in visual-notes block
+    Obsidian->>Plugin: render ```visual-notes codeblock
+    Plugin->>User: mount Cytoscape inside the codeblock host
 ```
 
 Daily Context auto-mode applies only to date-named daily notes such as

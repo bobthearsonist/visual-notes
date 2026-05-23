@@ -36,8 +36,10 @@ The Obsidian plugin has an MVP implementation:
 - sidecar writes stamped with producer/schema/hash/pin/usage metadata
 - optional `daily-context` provider support that extracts from structured daily
   sources and stamps `_sourceContext` metadata
-- `type: ai-session` notes bypass Daily Context in automatic mode so session
-  visuals are based on the session summary itself
+- Daily Context auto-mode is gated on the note's *filename* — only basenames
+  matching `YYYY-MM-DD.md` or `YYYYMMDD.md` qualify, so AI session summaries
+  (and any non-date-named note) implicitly bypass Daily Context and extract
+  from the note body itself
 - explicit `visual-notes` code blocks can reserve a persistent visual slot in
   AI session summary templates
 - inline Cytoscape rendering in Obsidian
