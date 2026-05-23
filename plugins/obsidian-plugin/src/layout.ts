@@ -268,11 +268,37 @@ function nudgeAway(
 
   // Pick the axis with more available room to push along.
   if (Math.abs(dx) >= Math.abs(dy)) {
-    const sign = dx >= 0 ? 1 : -1;
-    return { x: colliding.position.x + sign * COLLISION_RADIUS_X, y: position.y };
+    return { x: colliding.position.x + chooseAxisOffset(dx, COLLISION_RADIUS_X, colliding.position.x, SCHEMA_MIN_X, SCHEMA_MAX_X), y: position.y };
   }
-  const sign = dy >= 0 ? 1 : -1;
-  return { x: position.x, y: colliding.position.y + sign * COLLISION_RADIUS_Y };
+  return { x: position.x, y: colliding.position.y + chooseAxisOffset(dy, COLLISION_RADIUS_Y, colliding.position.y, SCHEMA_MIN_Y, SCHEMA_MAX_Y) };
+}
+
+// Choose ±radius for a nudge so the result stays inside [min, max]. Without
+// this, a collision at SCHEMA_MAX_X (or _MIN_X) gets nudged further out of
+// bounds, the caller clamps it back to the edge, and the collision never
+// clears — loop exhausts with overlap. Codex caught this on PR #23.
+function chooseAxisOffset(
+  delta: number,
+  radius: number,
+  anchor: number,
+  min: number,
+  max: number,
+): number {
+  const preferredSign = delta >= 0 ? 1 : -1;
+  const preferred = anchor + preferredSign * radius;
+  // If preferred direction stays in bounds, take it.
+  if (preferred >= min && preferred <= max) {
+    return preferredSign * radius;
+  }
+  // Preferred direction would clip — try the opposite.
+  const opposite = anchor - preferredSign * radius;
+  if (opposite >= min && opposite <= max) {
+    return -preferredSign * radius;
+  }
+  // Both sides clip (anchor sits within radius of both edges — graph wider
+  // than the schema allows). Best effort: smaller of the two pushes so the
+  // outer clamp at least minimizes the overlap.
+  return Math.abs(max - anchor) >= Math.abs(anchor - min) ? radius : -radius;
 }
 
 export function calculateLayoutMetrics(sidecar: VisualNotesSidecar): LayoutMetrics {
