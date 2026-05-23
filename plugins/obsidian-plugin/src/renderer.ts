@@ -43,14 +43,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   }
 
   onunload(): void {
-    const previewRoot = this.containerEl.closest(".markdown-preview-view");
     this.destroyGraph();
-    if (
-      previewRoot instanceof HTMLElement &&
-      previewRoot.dataset.visualNotesSourcePath === this.sourcePath
-    ) {
-      delete previewRoot.dataset.visualNotesSourcePath;
-    }
     if (this.removeContainerOnUnload) {
       this.containerEl.remove();
     }
