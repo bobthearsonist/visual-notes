@@ -12,7 +12,7 @@ import { resolve } from "node:path";
 // `pnpm validate`) still surfaces styling/lifecycle regressions.
 const rendererSource = readFileSync(resolve("src/renderer.ts"), "utf8");
 
-describe("VisualNotesRenderChild — renderer source contract (#21)", () => {
+describe("VisualNotesRenderChild — renderer source contract", () => {
   it("uses label-sized nodes with 11px / 500-weight text", () => {
     assert.match(rendererSource, /width: "label"/, "node width should be label-sized");
     assert.match(rendererSource, /height: "label"/, "node height should be label-sized");
@@ -20,7 +20,7 @@ describe("VisualNotesRenderChild — renderer source contract (#21)", () => {
     assert.match(rendererSource, /"font-weight": 500/, "node weight should be 500");
   });
 
-  it("uses straight edges with calm 11px normal-weight labels (#21 QA)", () => {
+  it("uses straight edges with calm 11px normal-weight labels", () => {
     assert.match(
       rendererSource,
       /"curve-style": "straight"/,

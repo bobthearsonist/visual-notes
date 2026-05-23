@@ -97,13 +97,13 @@ describe("applyDeterministicLayout — repair pass", () => {
     assert.deepEqual(anchor.position, { x: 500, y: 400 }, "anchor untouched");
   });
 
-  it("resolves boundary collision by pushing inward (Codex P1 #23 regression)", () => {
-    // Two nodes whose raw positions are off-canvas to the right. After
-    // clampOffCanvas both land at x=SCHEMA_MAX_X=5000, colliding. The naive
-    // nudge would push the second node further right (+140), then the clamp
-    // pulls it back to 5000, and the collision never clears. The fix:
-    // detect that the preferred-direction nudge would exceed the schema bound
-    // and flip the sign so the second node moves inward.
+  it("resolves boundary collisions by pushing inward", () => {
+    // Two nodes whose raw positions are off-canvas. After clampOffCanvas
+    // both land at the schema boundary, colliding. A naive nudge would
+    // push the second node further out, then the per-iteration clamp
+    // pulls it back to the same edge, and the collision never clears.
+    // The fix detects that the preferred-direction nudge would exceed
+    // bounds and flips the sign so the second node moves inward.
     const sidecar = makeSidecar([
       { id: "edge-a", classes: "system context", position: { x: 6000, y: 100 } },
       { id: "edge-b", classes: "system context", position: { x: 7000, y: 100 } },
