@@ -37,3 +37,6 @@ plugins/obsidian-plugin/src/schema.gen.ts
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# graphify per-repo graph artifacts (built locally, not source-controlled)
+graphify-out/
