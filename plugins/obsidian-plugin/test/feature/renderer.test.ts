@@ -229,3 +229,95 @@ describe("VisualNotesPlugin — main.ts mount strategy contract", () => {
     );
   });
 });
+
+describe("VisualNotesRenderChild — zoom and fullscreen controls", () => {
+  it("renders a controls toolbar in the header", () => {
+    assert.match(
+      rendererSource,
+      /renderControls/,
+      "renderer must define renderControls",
+    );
+    assert.match(
+      rendererSource,
+      /this\.renderControls\(header\)/,
+      "renderGraph must call this.renderControls(header)",
+    );
+  });
+
+  it("provides zoom-in and zoom-out methods that operate on cy.zoom", () => {
+    assert.match(rendererSource, /private zoomIn\(\): void/, "renderer must define zoomIn");
+    assert.match(rendererSource, /private zoomOut\(\): void/, "renderer must define zoomOut");
+    assert.match(
+      rendererSource,
+      /this\.cy\.zoom\([^)]*level[^)]*this\.cy\.zoom\(\) \* 1\.25/s,
+      "zoomIn must scale cy.zoom by ×1.25",
+    );
+    assert.match(
+      rendererSource,
+      /this\.cy\.zoom\([^)]*level[^)]*this\.cy\.zoom\(\) \/ 1\.25/s,
+      "zoomOut must scale cy.zoom by ÷1.25",
+    );
+  });
+
+  it("provides a toggleFullscreen method that adds/removes the fullscreen CSS class", () => {
+    assert.match(
+      rendererSource,
+      /private toggleFullscreen\(\): void/,
+      "renderer must define toggleFullscreen",
+    );
+    assert.match(
+      rendererSource,
+      /visual-notes-fullscreen/,
+      "renderer must reference the visual-notes-fullscreen CSS class",
+    );
+    assert.match(
+      rendererSource,
+      /this\.containerEl\.addClass\("visual-notes-fullscreen"\)/,
+      "toggleFullscreen must call addClass('visual-notes-fullscreen') when entering fullscreen",
+    );
+    assert.match(
+      rendererSource,
+      /this\.containerEl\.removeClass\("visual-notes-fullscreen"\)/,
+      "toggleFullscreen must call removeClass('visual-notes-fullscreen') when exiting fullscreen",
+    );
+  });
+
+  it("exits fullscreen on Escape keydown via registerDomEvent", () => {
+    assert.match(
+      rendererSource,
+      /registerDomEvent\(document, "keydown"/,
+      "renderer must register a keydown listener on document for Escape handling",
+    );
+    assert.match(
+      rendererSource,
+      /e\.key === "Escape" && this\.isFullscreen/,
+      "keydown handler must check for Escape key and fullscreen state",
+    );
+  });
+
+  it("clears fullscreen state in onunload to prevent stuck overlay on component destruction", () => {
+    const onunloadMatch = rendererSource.match(/onunload\(\): void \{[\s\S]*?\n  \}/);
+    assert.ok(onunloadMatch, "renderer must define onunload");
+    const body = onunloadMatch[0];
+    assert.match(
+      body,
+      /this\.isFullscreen/,
+      "onunload must check this.isFullscreen before cleanup",
+    );
+    assert.match(
+      body,
+      /removeClass\("visual-notes-fullscreen"\)/,
+      "onunload must remove the fullscreen class on component destruction",
+    );
+  });
+
+  it("includes zoom and fullscreen buttons with accessible labels in renderControls", () => {
+    const fnMatch = rendererSource.match(/private renderControls\([\s\S]*?\n  \}/);
+    assert.ok(fnMatch, "renderer must define renderControls");
+    const body = fnMatch[0];
+    assert.match(body, /"Zoom in"/, "renderControls must include a zoom-in button");
+    assert.match(body, /"Zoom out"/, "renderControls must include a zoom-out button");
+    assert.match(body, /"Fit to view"/, "renderControls must include a fit-to-view button");
+    assert.match(body, /fullscreen/, "renderControls must include a fullscreen button");
+  });
+});

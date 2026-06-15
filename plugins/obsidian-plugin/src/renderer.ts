@@ -16,6 +16,8 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
   private readonly sourcePath: string;
   private readonly removeContainerOnUnload: boolean;
   private readonly removeDuplicates: boolean;
+  private isFullscreen = false;
+  private fullscreenBtn: HTMLElement | null = null;
 
   constructor(
     containerEl: HTMLElement,
@@ -39,10 +41,20 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     });
     this.registerEvent(this.sidecarEventRef);
     this.registerEvent(this.plugin.app.workspace.on("css-change", () => this.applyTheme()));
+    this.registerDomEvent(document, "keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape" && this.isFullscreen) {
+        e.preventDefault();
+        this.toggleFullscreen();
+      }
+    });
     void this.render();
   }
 
   onunload(): void {
+    if (this.isFullscreen) {
+      this.isFullscreen = false;
+      this.containerEl.removeClass("visual-notes-fullscreen");
+    }
     this.destroyGraph();
     if (this.removeContainerOnUnload) {
       this.containerEl.remove();
@@ -88,6 +100,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     }
 
     this.renderLegend(header);
+    this.renderControls(header);
 
     const graphEl = this.containerEl.createDiv({ cls: "visual-notes-graph" });
     const elements: cytoscape.ElementDefinition[] = [
@@ -174,6 +187,79 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
       item.createDiv({ cls: `visual-notes-legend-swatch ${swatchClass}` });
       item.createDiv({ cls: "visual-notes-legend-text", text: label });
     });
+  }
+
+  private renderControls(parent: HTMLElement): void {
+    const controls = parent.createDiv({ cls: "visual-notes-controls" });
+
+    const zoomOutBtn = controls.createEl("button", {
+      cls: "visual-notes-btn",
+      attr: { "aria-label": "Zoom out", title: "Zoom out" },
+      text: "−",
+    });
+
+    const zoomInBtn = controls.createEl("button", {
+      cls: "visual-notes-btn",
+      attr: { "aria-label": "Zoom in", title: "Zoom in" },
+      text: "+",
+    });
+
+    const fitBtn = controls.createEl("button", {
+      cls: "visual-notes-btn",
+      attr: { "aria-label": "Fit to view", title: "Fit to view" },
+      text: "⊡",
+    });
+
+    this.fullscreenBtn = controls.createEl("button", {
+      cls: "visual-notes-btn",
+      attr: {
+        "aria-label": this.isFullscreen ? "Exit fullscreen" : "Enter fullscreen",
+        title: this.isFullscreen ? "Exit fullscreen" : "Enter fullscreen",
+      },
+      text: this.isFullscreen ? "✕" : "⛶",
+    });
+
+    zoomOutBtn.addEventListener("click", () => this.zoomOut());
+    zoomInBtn.addEventListener("click", () => this.zoomIn());
+    fitBtn.addEventListener("click", () => this.refitGraph());
+    this.fullscreenBtn.addEventListener("click", () => this.toggleFullscreen());
+  }
+
+  private zoomIn(): void {
+    if (!this.cy) return;
+    this.cy.zoom({
+      level: this.cy.zoom() * 1.25,
+      renderedPosition: { x: this.cy.width() / 2, y: this.cy.height() / 2 },
+    });
+  }
+
+  private zoomOut(): void {
+    if (!this.cy) return;
+    this.cy.zoom({
+      level: this.cy.zoom() / 1.25,
+      renderedPosition: { x: this.cy.width() / 2, y: this.cy.height() / 2 },
+    });
+  }
+
+  private toggleFullscreen(): void {
+    this.isFullscreen = !this.isFullscreen;
+    if (this.isFullscreen) {
+      this.containerEl.addClass("visual-notes-fullscreen");
+    } else {
+      this.containerEl.removeClass("visual-notes-fullscreen");
+    }
+    if (this.fullscreenBtn) {
+      this.fullscreenBtn.textContent = this.isFullscreen ? "✕" : "⛶";
+      this.fullscreenBtn.setAttribute(
+        "aria-label",
+        this.isFullscreen ? "Exit fullscreen" : "Enter fullscreen",
+      );
+      this.fullscreenBtn.setAttribute(
+        "title",
+        this.isFullscreen ? "Exit fullscreen" : "Enter fullscreen",
+      );
+    }
+    this.scheduleRefitGraph();
   }
 
   private applyTheme(): void {
@@ -397,6 +483,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.refitScheduled = false;
     this.cy?.destroy();
     this.cy = null;
+    this.fullscreenBtn = null;
   }
 
   private removeDuplicateContainersForSource(): void {
