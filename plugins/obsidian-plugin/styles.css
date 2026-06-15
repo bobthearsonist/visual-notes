@@ -165,3 +165,52 @@
   color: var(--text-muted);
   padding: 1rem;
 }
+
+.visual-notes-controls {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+}
+
+.visual-notes-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.visual-notes-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.visual-notes-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-notice, 200);
+  margin: 0;
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.visual-notes-fullscreen .visual-notes-graph {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
