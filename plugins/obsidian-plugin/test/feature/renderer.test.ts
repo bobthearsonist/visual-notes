@@ -249,12 +249,12 @@ describe("VisualNotesRenderChild — zoom and fullscreen controls", () => {
     assert.match(rendererSource, /private zoomOut\(\): void/, "renderer must define zoomOut");
     assert.match(
       rendererSource,
-      /this\.cy\.zoom\(.*level.*this\.cy\.zoom\(\) \* 1\.25/s,
+      /this\.cy\.zoom\([^)]*level[^)]*this\.cy\.zoom\(\) \* 1\.25/s,
       "zoomIn must scale cy.zoom by ×1.25",
     );
     assert.match(
       rendererSource,
-      /this\.cy\.zoom\(.*level.*this\.cy\.zoom\(\) \/ 1\.25/s,
+      /this\.cy\.zoom\([^)]*level[^)]*this\.cy\.zoom\(\) \/ 1\.25/s,
       "zoomOut must scale cy.zoom by ÷1.25",
     );
   });

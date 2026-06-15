@@ -43,6 +43,7 @@ export class VisualNotesRenderChild extends MarkdownRenderChild {
     this.registerEvent(this.plugin.app.workspace.on("css-change", () => this.applyTheme()));
     this.registerDomEvent(document, "keydown", (e: KeyboardEvent) => {
       if (e.key === "Escape" && this.isFullscreen) {
+        e.preventDefault();
         this.toggleFullscreen();
       }
     });
