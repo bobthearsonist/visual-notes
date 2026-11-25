@@ -265,7 +265,7 @@ honors whatever you produce.
 - [x] diagnosed matcher field misuse — was holding a permission rule
 - [x] fixed via matcher/if split (per Claude Code docs)
 - [x] confirmed end-to-end: Bash hook fires, run-hook.sh emits envelope
-- [x] narrowed if pattern to scope to Captains Log specifically
+- [x] narrowed if pattern to scope to the work log specifically
 
 ## Notes
 - spent way too long because settings.json edits don't reload mid-session

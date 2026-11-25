@@ -236,8 +236,8 @@ After enabling:
 
 1. Open **Settings → Visual Notes**.
 2. Paste an Anthropic API key.
-3. Add watched folders, such as `Daily Notes`, `Captains Log`, `0 AI Sessions`,
-   or `0 Profisee/AI Sessions`.
+3. Add watched folders, such as `Daily Notes`, `Work Log`, `AI Sessions`,
+   or `Work/AI Sessions`.
 4. Choose a debounce and model, or keep the defaults.
 5. Save or manually extract a note with
    **Visual Notes: Extract from current note**.

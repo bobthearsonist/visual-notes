@@ -281,7 +281,7 @@ Open areas:
 
 ### Legacy hook artifacts vs. plugin renderer
 
-Several work-vault folders (notably `0 Profisee/...`) contain static
+Several work-vault folders (notably `Work/...`) contain static
 `*-overview.html` and `whiteboard.html` files alongside their
 `*-overview.json` sidecars. These HTMLs were produced by a prior
 agent-curated workflow:

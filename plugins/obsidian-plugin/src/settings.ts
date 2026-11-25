@@ -80,7 +80,7 @@ export class VisualNotesSettingTab extends PluginSettingTab {
         .setName(`Folder ${index + 1}`)
         .addText((text) => {
           text
-            .setPlaceholder("Captains Log")
+            .setPlaceholder("Daily Notes")
             .setValue(folder)
             .onChange(async (value) => {
               this.plugin.settings.watchedFolders[index] = value.trim();

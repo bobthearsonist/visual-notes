@@ -37,8 +37,8 @@ test("getDailyContextApi discovers supported Daily Context plugin API", async ()
 });
 
 test("normalizeDailyContextDateFromPath supports compact and dashed daily note names", () => {
-  assert.equal(normalizeDailyContextDateFromPath("0 Daily ADHD Brain Logs/20260511.md"), "2026-05-11");
-  assert.equal(normalizeDailyContextDateFromPath("Captains Log/2026-05-11.md"), "2026-05-11");
+  assert.equal(normalizeDailyContextDateFromPath("Daily Notes/20260511.md"), "2026-05-11");
+  assert.equal(normalizeDailyContextDateFromPath("Work Log/2026-05-11.md"), "2026-05-11");
   assert.equal(normalizeDailyContextDateFromPath("0 AI Sessions/2026-05-11 planning/2026-05-11 planning.md"), null);
   assert.equal(normalizeDailyContextDateFromPath("Notes/meeting.md"), null);
 });
@@ -65,7 +65,7 @@ test("buildDailyContextExtractionInput creates deterministic source sections and
         {
           id: "notes",
           kind: "daily-section",
-          path: "0 Daily ADHD Brain Logs/20260511.md",
+          path: "Daily Notes/20260511.md",
           label: "Notes",
           hash: HASH_B,
           content: "Manual note content.\nSecond source line.",
@@ -215,7 +215,7 @@ function dailyContext(overrides: Partial<DailyContext> = {}): DailyContext {
     date: "2026-05-11",
     dateTag: "date/2026/05/11",
     contextHash: HASH_A,
-    contexts: [{ id: "personal", dailyFolder: "0 Daily ADHD Brain Logs", aiSessionFolders: ["0 AI Sessions"] }],
+    contexts: [{ id: "personal", dailyFolder: "Daily Notes", aiSessionFolders: ["AI Sessions"] }],
     sources: [],
     ...overrides,
   };

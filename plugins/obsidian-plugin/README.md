@@ -67,7 +67,7 @@ After install, open Settings → Visual Notes:
 | Setting | What it does |
 |---|---|
 | **Anthropic API key** | Required. Get one at [console.anthropic.com](https://console.anthropic.com). Stored in plaintext `data.json` for this first pass. |
-| **Watched folders** | A list of folders containing notes to visualize. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add daily folders and AI session folders as needed (e.g., `0 Daily ADHD Brain Logs`, `0 Profisee/Captains Log`, `0 AI Sessions`, `0 Profisee/AI Sessions`). Each folder produces sidecars in-place; same model, same prompt, same schema across all watched folders. |
+| **Watched folders** | A list of folders containing notes to visualize. **Empty by default** — add at least one for the plugin to do anything. Subfolders are searched recursively. Add daily folders and AI session folders as needed (e.g., `Daily Notes`, `Work/Work Log`, `AI Sessions`, `Work/AI Sessions`). Each folder produces sidecars in-place; same model, same prompt, same schema across all watched folders. |
 | **Debounce (ms)** | How long to wait after the last save before extracting. Default: 1500ms. |
 | **Model** | `claude-haiku-4-5` (default, ~$0.006/extraction) or `claude-sonnet-4-6` (~$0.02). |
 | **Use Daily Context** | When the `daily-context` plugin is available, extract from structured daily sources instead of raw note markdown. |

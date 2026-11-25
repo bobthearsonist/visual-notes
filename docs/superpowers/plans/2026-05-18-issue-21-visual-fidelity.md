@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Cytoscape.js 3.28, Obsidian Plugin API, esbuild, node:test runner (built-in), pnpm monorepo, vitest is NOT used.
 
-**Working directory for this plan:** `/Users/dislexicmofo/Repositories/visual-notes-issue-21` (worktree on branch `feat/issue-21-visual-fidelity`)
+**Working directory for this plan:** `<worktree>` (worktree on branch `feat/issue-21-visual-fidelity`)
 
 **Spec:** [`docs/superpowers/specs/2026-05-18-issue-21-visual-fidelity-design.md`](../specs/2026-05-18-issue-21-visual-fidelity-design.md)
 
@@ -25,7 +25,7 @@ Done first because (1) the test fixtures it produces are needed for Phase B's ma
 
 - [ ] **Step 1: Confirm worktree, branch, and clean tree**
 
-Run: `git -C /Users/dislexicmofo/Repositories/visual-notes-issue-21 status --short && git -C /Users/dislexicmofo/Repositories/visual-notes-issue-21 branch --show-current`
+Run: `git -C <worktree> status --short && git -C <worktree> branch --show-current`
 
 Expected:
 ```
@@ -35,19 +35,19 @@ feat/issue-21-visual-fidelity
 
 - [ ] **Step 2: Install dependencies**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm install`
+Run: `cd <worktree> && pnpm install`
 
 Expected: succeeds with no errors. If you see `node_modules` already, this is a no-op.
 
 - [ ] **Step 3: Confirm baseline tests pass**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: all three existing test files pass (`daily-context.test.ts`, `hash.test.ts`, `sectioned-sidecar.test.ts`). If any fail, STOP — investigate and fix before proceeding.
 
 - [ ] **Step 4: Confirm baseline validate scripts pass**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate`
 
 Expected: typecheck + `validate:layout` + `validate:renderer` all pass.
 
@@ -62,21 +62,21 @@ Expected: typecheck + `validate:layout` + `validate:renderer` all pass.
 
 - [ ] **Step 1: Create the fixtures directory if missing**
 
-Run: `mkdir -p /Users/dislexicmofo/Repositories/visual-notes-issue-21/plugins/obsidian-plugin/test/fixtures`
+Run: `mkdir -p <worktree>/plugins/obsidian-plugin/test/fixtures`
 
 - [ ] **Step 2: Copy the legacy whiteboard JSON as canonical "good positions" fixture**
 
 Run:
 ```bash
-cp "/Users/dislexicmofo/SynologyDrive/Test/0 Profisee/Captains Log/20260515-overview.json" \
-   /Users/dislexicmofo/Repositories/visual-notes-issue-21/plugins/obsidian-plugin/test/fixtures/narrative-positioned-overview.json
+cp "<vault>/Work/Work Log/20260515-overview.json" \
+   <worktree>/plugins/obsidian-plugin/test/fixtures/narrative-positioned-overview.json
 ```
 
 This file contains 12 narrative-positioned nodes (PR #22074 / bug 156294 day) authored by the legacy hook. Acts as the canonical "well-placed LLM positions" input for repair-preserves tests.
 
 - [ ] **Step 3: Verify fixture is valid JSON**
 
-Run: `jq -r '.kind, (.nodes | length), (.edges | length)' /Users/dislexicmofo/Repositories/visual-notes-issue-21/plugins/obsidian-plugin/test/fixtures/narrative-positioned-overview.json`
+Run: `jq -r '.kind, (.nodes | length), (.edges | length)' <worktree>/plugins/obsidian-plugin/test/fixtures/narrative-positioned-overview.json`
 
 Expected:
 ```
@@ -88,7 +88,7 @@ daily-overview
 - [ ] **Step 4: Commit the fixture**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/fixtures/narrative-positioned-overview.json
 git commit -m "test(obsidian): add narrative-positioned overview fixture
 
@@ -149,7 +149,7 @@ describe("applyDeterministicLayout — repair pass", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: the new test fails with an inequality — `applyDeterministicLayout` rewrites the positions into a grid, so `after` differs from `before`.
 
@@ -176,14 +176,14 @@ Leave the rest of the file (helpers, `calculateLayoutMetrics`, the dead `layoutN
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: new test passes; the three existing tests still pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/feature/layout.test.ts plugins/obsidian-plugin/src/layout.ts
 git commit -m "feat(obsidian): begin repair-pass refactor; preserve well-placed positions
 
@@ -247,7 +247,7 @@ function makeSidecar(
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: the new clamp test fails with `-500 !== -200` (or similar) — `repairNodes` currently passes positions through unchanged.
 
@@ -289,14 +289,14 @@ function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: both repair tests pass; existing tests still pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/feature/layout.test.ts plugins/obsidian-plugin/src/layout.ts
 git commit -m "feat(obsidian): repair pass clamps off-canvas positions
 
@@ -350,7 +350,7 @@ it("preserves first node when separating a colliding pair", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: both collision tests fail — `repairNodes` doesn't separate yet.
 
@@ -448,14 +448,14 @@ function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: all four repair tests pass; existing tests still pass; `clamp` symbol may need re-import — if you see an error about `clamp` being unresolved at module scope vs. function-local, ensure both new functions reference the existing in-file `clamp` (no import change needed; it's already in the same file).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/feature/layout.test.ts plugins/obsidian-plugin/src/layout.ts
 git commit -m "feat(obsidian): repair pass separates colliding nodes
 
@@ -517,7 +517,7 @@ const SCHEMA_MAX_Y_BOUND = 3000;
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: the new test fails — `ghost` remains at `(0, 0)`.
 
@@ -632,14 +632,14 @@ function repairNodes(nodes: VisualNotesNode[]): VisualNotesNode[] {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: all repair tests pass; existing tests still pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/feature/layout.test.ts plugins/obsidian-plugin/src/layout.ts
 git commit -m "feat(obsidian): repair pass assigns positions for missing nodes
 
@@ -680,7 +680,7 @@ it("returns pinned sidecars unchanged even when positions look broken", () => {
 
 - [ ] **Step 2: Run test to verify it passes immediately**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: this test **already passes**, because Task 3 preserved the `if (sidecar._pinned) return sidecar;` short-circuit. The reason for writing it as a TDD step is to lock the invariant in place so any future refactor that loses the short-circuit is caught immediately.
 
@@ -701,14 +701,14 @@ export function applyDeterministicLayout(sidecar: VisualNotesSidecar): VisualNot
 
 - [ ] **Step 4: Run all feature tests to confirm green**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: all repair tests + existing tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/test/feature/layout.test.ts
 git commit -m "test(obsidian): lock pinned-sidecar short-circuit with regression test
 
@@ -863,7 +863,7 @@ Add a comment above `buildVisualComponents`:
 
 - [ ] **Step 3: Run typecheck and tests**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: both succeed. If TypeScript complains about unused symbols, either:
 - Confirm the symbol genuinely has no consumers (`grep -r "<symbolName>" plugins/obsidian-plugin/src plugins/obsidian-plugin/test plugins/obsidian-plugin/scripts`) and delete it
@@ -871,7 +871,7 @@ Expected: both succeed. If TypeScript complains about unused symbols, either:
 
 - [ ] **Step 4: Run `validate:layout` to confirm metrics still work**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:layout`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:layout`
 
 Expected: the script may **fail** the quality gates — the fixtures inside it are intentionally-bad inputs that previously got fully re-laid out, and now only get repaired. Don't fix the script in this task; Task 9 handles it. Note the failure(s) and move on.
 
@@ -880,7 +880,7 @@ If the script passes: the existing fixtures happened to be repair-friendly. Luck
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/src/layout.ts
 git commit -m "refactor(obsidian): drop dead grid-layout code (#21)
 
@@ -967,14 +967,14 @@ const qualityGate = {
 
 - [ ] **Step 4: Run `validate:layout` to confirm passing**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:layout`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:layout`
 
 Expected: both fixtures pass. If the collision-repair fixture fails because the repaired positions still violate `minNodeDistance`, raise the collision constants in `src/layout.ts` slightly OR tune `minNodeDistance` to match what the repair guarantees (90 is a safe floor given 70-radius Y and 140-radius X).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/scripts/layout-metrics.mjs
 git commit -m "test(obsidian): retarget layout-metrics fixtures for repair pass (#21)
 
@@ -1036,7 +1036,7 @@ The diff vs. before: `font-size 13→11`, `font-weight 600→500`, `width 118→
 
 - [ ] **Step 3: Typecheck**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin typecheck`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin typecheck`
 
 Expected: passes. Cytoscape's TypeScript types accept `"label"` as a valid value for `width` and `height` (it's a documented literal in their style system).
 
@@ -1044,14 +1044,14 @@ If you see a TypeScript error, the cytoscape style cast at the end of `createSty
 
 - [ ] **Step 4: Run feature tests**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: all pass. (No renderer tests yet check the new values — that's added in Task 13 alongside hover testing.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/src/renderer.ts
 git commit -m "feat(obsidian): label-sized nodes with calmer font (#21)
 
@@ -1137,14 +1137,14 @@ Diff: `width 1→3`.
 
 - [ ] **Step 4: Typecheck + feature tests**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: both succeed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/src/renderer.ts
 git commit -m "feat(obsidian): calmer edge labels and legacy edge widths (#21)
 
@@ -1183,20 +1183,20 @@ this.cy = cytoscape({
 
 - [ ] **Step 3: Typecheck**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin typecheck`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin typecheck`
 
 Expected: passes.
 
 - [ ] **Step 4: Run feature tests**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: passes.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/src/renderer.ts
 git commit -m "feat(obsidian): smoother zoom (wheelSensitivity 0.3) (#21)
 
@@ -1226,7 +1226,7 @@ if (!source.includes("--interactive-accent")) {
 
 - [ ] **Step 2: Run `validate:renderer` to verify the new assertion fails**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
 
 Expected: fails with "renderer must bind hover handlers for edge highlighting" — `bindHoverInteractions` doesn't exist yet.
 
@@ -1282,20 +1282,20 @@ this.observeGraphSize(graphEl);
 
 - [ ] **Step 4: Run `validate:renderer` to confirm passing**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
 
 Expected: passes. If it still fails, check the assertion strings in `renderer-contract.mjs` against the actual symbol names — exact substring match is required.
 
 - [ ] **Step 5: Typecheck and test**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin typecheck && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: both succeed.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/src/renderer.ts plugins/obsidian-plugin/scripts/renderer-contract.mjs
 git commit -m "feat(obsidian): hover edge highlighting (#21)
 
@@ -1336,7 +1336,7 @@ These now fail because Tasks 10-11 changed every one of those values.
 
 - [ ] **Step 2: Run validate:renderer to see the current failures**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
 
 Expected: failures complaining about font-size 14, font-weight 700, arrow-scale 0.8, text-background-opacity 0.95, text-background-padding 5px.
 
@@ -1365,14 +1365,14 @@ if (!source.includes("wheelSensitivity: 0.3")) {
 
 - [ ] **Step 4: Run validate:renderer to confirm passing**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate:renderer`
 
 Expected: all assertions pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add plugins/obsidian-plugin/scripts/renderer-contract.mjs
 git commit -m "test(obsidian): update renderer contract to match #21 styling
 
@@ -1445,7 +1445,7 @@ Append (before `## Reference links`):
 ```markdown
 ### Legacy hook artifacts vs. plugin renderer
 
-Several work-vault folders (notably `0 Profisee/...`) contain static
+Several work-vault folders (notably `Work/...`) contain static
 `*-overview.html` and `whiteboard.html` files alongside their
 `*-overview.json` sidecars. These HTMLs were produced by a prior
 agent-curated workflow:
@@ -1471,7 +1471,7 @@ you're working on the legacy path. If you're touching
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add docs/design.md
 git commit -m "docs: resolve layout-strategy open decision; legacy vs plugin section (#21)
 
@@ -1527,7 +1527,7 @@ for context.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add README.md plugins/obsidian-plugin/README.md
 git commit -m "docs(readme): point users to legacy vs plugin explainer (#21)
 
@@ -1548,13 +1548,13 @@ arrive at the repo via README rather than design.md."
 
 - [ ] **Step 1: Run the full validate suite**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin validate && pnpm --filter @visual-notes/obsidian-plugin test:feature`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin validate && pnpm --filter @visual-notes/obsidian-plugin test:feature`
 
 Expected: typecheck + validate:layout + validate:renderer + all feature tests pass.
 
 - [ ] **Step 2: Build the plugin**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && pnpm --filter @visual-notes/obsidian-plugin build`
+Run: `cd <worktree> && pnpm --filter @visual-notes/obsidian-plugin build`
 
 Expected: produces `plugins/obsidian-plugin/main.js` (or similar build artifact). No errors.
 
@@ -1568,14 +1568,14 @@ You have two options:
 
 ```bash
 # From a test vault's .obsidian/plugins directory
-ln -s /Users/dislexicmofo/Repositories/visual-notes-issue-21/plugins/obsidian-plugin visual-notes-issue-21
+ln -s <worktree>/plugins/obsidian-plugin visual-notes-issue-21
 ```
 
 Enable the plugin from Obsidian's Community plugins settings.
 
 - [ ] **Step 4: Force-regenerate today's overview**
 
-In Obsidian, open `0 Daily ADHD Brain Logs/20260518.md` (or whichever daily note's `*-overview.json` you want to refresh). Use the command palette: `Visual Notes: Force regenerate sidecar`.
+In Obsidian, open `Daily Notes/20260518.md` (or whichever daily note's `*-overview.json` you want to refresh). Use the command palette: `Visual Notes: Force regenerate sidecar`.
 
 Wait for the extraction to finish (status bar shows count).
 
@@ -1607,7 +1607,7 @@ Pick an existing daily-overview sidecar from before this PR. Open the note in Ob
 If anything in Steps 5-7 surfaced a needed tweak (e.g., edge color too faint, hover thickness too aggressive), make the fix and commit:
 
 ```bash
-cd /Users/dislexicmofo/Repositories/visual-notes-issue-21
+cd <worktree>
 git add <changed file(s)>
 git commit -m "fix(obsidian): <specific QA adjustment> (#21)"
 ```
@@ -1616,7 +1616,7 @@ If no adjustments were needed, no commit. Skip this step.
 
 - [ ] **Step 9: Final summary**
 
-Run: `cd /Users/dislexicmofo/Repositories/visual-notes-issue-21 && git log --oneline main..feat/issue-21-visual-fidelity`
+Run: `cd <worktree> && git log --oneline main..feat/issue-21-visual-fidelity`
 
 Expected: ~14-16 commits forming a clean linear history. Each is a self-contained change a reviewer can read in isolation.
 

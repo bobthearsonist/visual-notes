@@ -12,7 +12,7 @@
 
 **Constraints** (from issue + brainstorm):
 
-- Don't modify existing work artifacts under `0 Profisee/...`.
+- Don't modify existing work artifacts under `Work/...`.
 - Don't reintroduce the legacy iframe / `regenerate.py` path.
 - Preserve standalone-plugin architecture: works for any watched markdown.
 - Preserve current Obsidian theme-var integration (CSS reads `--background-primary` etc.); don't regress to hardcoded colors.
@@ -211,7 +211,7 @@ Use a real, narrative-positioned overview (e.g., copy of `20260515-overview.json
 
 2. **"Open decisions" table row `Layout algorithm`** — change "Keep preset positions; A/B force-directed" → "✅ Trust LLM positions + repair pass (decided in #21)".
 
-3. **New section: "Legacy hook artifacts vs. plugin renderer"** — explain that `whiteboard.html` files under `0 Profisee/...` are historical artifacts from the prior agent-curated workflow and are not the future direction; future renders come from the Obsidian plugin reading sidecar JSON. This satisfies acceptance criterion 4.
+3. **New section: "Legacy hook artifacts vs. plugin renderer"** — explain that `whiteboard.html` files under `Work/...` are historical artifacts from the prior agent-curated workflow and are not the future direction; future renders come from the Obsidian plugin reading sidecar JSON. This satisfies acceptance criterion 4.
 
 ### `README.md` and `plugins/obsidian-plugin/README.md`
 
@@ -266,7 +266,7 @@ The legacy hook approach used `width: label, height: label` and the resulting va
 Before merge:
 
 1. `pnpm --filter obsidian-plugin lint && pnpm --filter obsidian-plugin typecheck && pnpm --filter obsidian-plugin test` all pass.
-2. Manual: open today's overview (`/Users/dislexicmofo/SynologyDrive/Test/0 Daily ADHD Brain Logs/20260518.md`) in Obsidian after running force-regenerate; visually compare to PROPOSED preview HTML. Differences in cluster organization are expected (real LLM positions vs. hand-authored simulation); look for: label-sized nodes, calmer edge labels, hover edge highlight working.
+2. Manual: open today's overview (`<vault>/Daily Notes/20260518.md`) in Obsidian after running force-regenerate; visually compare to PROPOSED preview HTML. Differences in cluster organization are expected (real LLM positions vs. hand-authored simulation); look for: label-sized nodes, calmer edge labels, hover edge highlight working.
 3. Manual: open a pinned sidecar and confirm it is not affected by the repair pass.
 4. Manual: confirm an existing grid'd sidecar still renders (just keeps its grid positions; no re-layout).
 

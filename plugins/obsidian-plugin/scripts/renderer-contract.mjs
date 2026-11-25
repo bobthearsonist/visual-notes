@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { getSharedRendererSourceFailures } from "./shared-renderer-assertions.mjs";
 
-const expectedProfiseeFixture = {
+const expectedWorkLogFixture = {
   nodeIds: [
     "ccusage",
     "token-limit",
@@ -41,7 +41,7 @@ const failures = [
 
 console.log("Fixture: renderer MVP contract");
 console.log(
-  `Expected: ${expectedProfiseeFixture.nodeIds.length} nodes, ${expectedProfiseeFixture.edges.length} labeled edges`,
+  `Expected: ${expectedWorkLogFixture.nodeIds.length} nodes, ${expectedWorkLogFixture.edges.length} labeled edges`,
 );
 
 if (failures.length > 0) {
@@ -54,25 +54,25 @@ if (failures.length > 0) {
 
 function evaluateFixtureContract() {
   const contractFailures = [];
-  const nodeIds = expectedProfiseeFixture.nodeIds;
+  const nodeIds = expectedWorkLogFixture.nodeIds;
   const nodeIdSet = new Set(nodeIds);
 
   if (nodeIds.length !== 12) {
-    contractFailures.push(`Profisee fixture should keep 12 nodes, got ${nodeIds.length}`);
+    contractFailures.push(`Work-log fixture should keep 12 nodes, got ${nodeIds.length}`);
   }
-  if (expectedProfiseeFixture.edges.length !== 11) {
-    contractFailures.push(`Profisee fixture should keep 11 edges, got ${expectedProfiseeFixture.edges.length}`);
+  if (expectedWorkLogFixture.edges.length !== 11) {
+    contractFailures.push(`Work-log fixture should keep 11 edges, got ${expectedWorkLogFixture.edges.length}`);
   }
   if (nodeIdSet.size !== nodeIds.length) {
-    contractFailures.push("Profisee fixture node ids must be unique");
+    contractFailures.push("Work-log fixture node ids must be unique");
   }
 
-  expectedProfiseeFixture.edges.forEach(([source, target, label]) => {
+  expectedWorkLogFixture.edges.forEach(([source, target, label]) => {
     if (!nodeIdSet.has(source) || !nodeIdSet.has(target)) {
-      contractFailures.push(`Profisee edge references missing endpoint: ${source}->${target}`);
+      contractFailures.push(`Work-log edge references missing endpoint: ${source}->${target}`);
     }
     if (!label.trim()) {
-      contractFailures.push(`Profisee edge must keep a visible label: ${source}->${target}`);
+      contractFailures.push(`Work-log edge must keep a visible label: ${source}->${target}`);
     }
   });
 
