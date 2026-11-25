@@ -111,7 +111,8 @@ mode**. Sidecar: `{sessions_folder}/{YYYY-MM-DD topic}/{YYYY-MM-DD topic}-overvi
 
 1. Find the vault path, daily folder and sessions folder in the config file named by
    the Visual Notes plugin's **Agent config file** setting (its `obsidian:` block:
-   `vault_path`, `contexts.<name>.daily_folder`, `ai_session_folders`).
+   `vault_path` root, `default_vault` or `contexts.<name>.vault`, then
+   `contexts.<name>.daily_folder` and `ai_session_folders` inside that vault).
 2. Use the session folder selected by `obsidian-notes`: `{sessions_folder}/{YYYY-MM-DD topic}/`.
 3. Seed initial nodes from active context:
    - Read yesterday's daily note for unfinished `- [ ]` next steps -> `context` nodes

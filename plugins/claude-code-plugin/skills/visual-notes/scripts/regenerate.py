@@ -125,7 +125,10 @@ def load_configured_folders(vault_root: Path) -> list[Path]:
     """Note folders from the per-machine config file named by the plugin's
     `agentConfigPath` setting. That file's `obsidian:` block holds `vault_path`
     and `contexts.<name>.daily_folder` / `ai_session_folders`, so folder names
-    live only in machine config, never in this repo. Only that one setting is
+    live only in machine config, never in this repo. With `default_vault` set,
+    `vault_path` is the root holding every vault and each context's folders sit
+    in `vault_path/<contexts.<name>.vault or default_vault>`; without it,
+    `vault_path` is the vault itself. Only that one setting is
     read from data.json, which also holds secrets. Returns [] when nothing is
     configured or readable."""
     settings = _read_mapping(vault_root / ".obsidian" / "plugins" / PLUGIN_ID / "data.json") or {}
@@ -136,12 +139,15 @@ def load_configured_folders(vault_root: Path) -> list[Path]:
     if not isinstance(obsidian, dict):
         return []
     vault_path = Path(str(obsidian.get("vault_path") or vault_root)).expanduser()
+    default_vault = str(obsidian.get("default_vault") or "")
     folders: list[Path] = []
     for context in (obsidian.get("contexts") or {}).values():
         if not isinstance(context, dict):
             continue
+        vault = str(context.get("vault") or default_vault)
+        base = vault_path / vault if default_vault or context.get("vault") else vault_path
         names = [context.get("daily_folder"), *(context.get("ai_session_folders") or [])]
-        folders.extend((vault_path / str(name)).resolve() for name in names if name)
+        folders.extend((base / str(name)).resolve() for name in names if name)
     return folders
 
 

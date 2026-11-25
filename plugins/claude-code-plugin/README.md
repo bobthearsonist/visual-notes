@@ -37,15 +37,18 @@ limit it to your daily and session note folders, point the Obsidian plugin's
 
 ```yaml
 obsidian:
-  vault_path: /path/to/your/vault
+  vault_path: /path/to/Obsidian   # root folder holding every vault
+  default_vault: Main             # vault a context uses unless it sets `vault`
   contexts:
     work:
+      vault: Main                 # optional
       daily_folder: Daily Notes
       ai_session_folders:
         - AI Sessions
 ```
 
-The hook finds the vault from the sidecar's own path, reads that setting from the
+Without `default_vault`, `vault_path` is treated as the vault itself (the older
+single-vault form). The hook finds the vault from the sidecar's own path, reads that setting from the
 vault's plugin settings, and reads the folders from the file. Keep the file
 outside the vault and outside any published repo: it describes one machine. YAML
 needs PyYAML or `yq`.
