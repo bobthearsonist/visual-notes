@@ -1,7 +1,7 @@
 {
   "name": "visual-notes",
-  "description": "Hooks and skills for the Visual Notes concept-map system. Lets AI agents pre-populate sidecar JSONs that the Obsidian plugin renders.",
-  "version": "0.1.0",
+  "description": "Agent side of Visual Notes: a skill for authoring concept-map sidecars, commands for agent or plugin extraction, and a hook that conforms and pins agent-written sidecars so the Obsidian plugin renders them.",
+  "version": "0.2.0",
   "author": {
     "name": "bobthearsonist",
     "url": "https://github.com/bobthearsonist"
@@ -9,5 +9,13 @@
   "homepage": "https://github.com/bobthearsonist/visual-notes",
   "repository": "https://github.com/bobthearsonist/visual-notes",
   "license": "MIT",
-  "keywords": ["obsidian", "visual-notes", "concept-map", "captains-log"]
+  "keywords": ["obsidian", "visual-notes", "concept-map"],
+  "commands": "./commands/",
+  "userConfig": {
+    "visual_notes_enabled": {
+      "type": "boolean",
+      "title": "Conform and pin agent-written sidecars",
+      "description": "After an agent writes or edits a {basename}-overview.json sidecar, conform it to the plugin's strict schema and pin it so the visual-notes fence renders it. Requires python on PATH."
+    }
+  }
 }

@@ -1,6 +1,22 @@
 {
-  "description": "Visual Notes hook: after `obsidian append` to a Captain's Log file, nudge the agent to update the daily-overview sidecar. Migration in progress.",
+  "description": "Visual Notes: conform and pin agent-written -overview.json sidecars after each write or edit.",
   "hooks": {
-    "PostToolUse": []
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-regenerate-visual.sh\"",
+            "if": "Write(*-overview.json)"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/run-regenerate-visual.sh\"",
+            "if": "Edit(*-overview.json)"
+          }
+        ]
+      }
+    ]
   }
 }
