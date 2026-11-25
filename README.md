@@ -229,7 +229,7 @@ pnpm --filter @visual-notes/obsidian-plugin build
 ```
 
 Then copy or symlink `plugins/obsidian-plugin` into your vault's
-`.obsidian/plugins/visual-notes` directory and enable **Visual Notes** in
+`.obsidian/plugins/visual-daily-notes` directory and enable **Visual Daily Notes** in
 Obsidian's Community plugins settings.
 
 After enabling:

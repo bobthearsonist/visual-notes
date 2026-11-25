@@ -40,7 +40,7 @@ default**:
 | Mode | Builds the graph | Invoked by | Result |
 |---|---|---|---|
 | **agent** | the AI agent, from full session context (richer) | `/obsidian-visual-summary-agent` | agent writes a loose sidecar → PostToolUse hook conforms it to the strict schema + stamps `_pinned:true` → plugin stands down → fence renders it |
-| **plugin** | the plugin's own LLM extractor | `/obsidian-visual-summary-plugin` | `obsidian open` the note, then `obsidian eval` runs `executeCommandById('visual-notes:regenerate-current-note-force')` (overrides any pin; result is unpinned, plugin-owned) |
+| **plugin** | the plugin's own LLM extractor | `/obsidian-visual-summary-plugin` | `obsidian open` the note, then `obsidian eval` runs `executeCommandById('visual-daily-notes:regenerate-current-note-force')` (overrides any pin; result is unpinned, plugin-owned) |
 
 `_pinned` is the per-document selector: **pinned** = agent-authored is
 authoritative (plugin extractor stands down); **unpinned / force** = plugin owns
@@ -76,7 +76,7 @@ The fence renders the JSON sidecar directly.
 
 ```bash
 obsidian open path="{sessions_folder}/{YYYY-MM-DD topic}/{YYYY-MM-DD topic}.md"
-obsidian eval code="app.commands.executeCommandById('visual-notes:regenerate-current-note-force')"
+obsidian eval code="app.commands.executeCommandById('visual-daily-notes:regenerate-current-note-force')"
 ```
 
 Fire-and-forget: extraction runs async (~$0.006/run) and the fence re-renders when

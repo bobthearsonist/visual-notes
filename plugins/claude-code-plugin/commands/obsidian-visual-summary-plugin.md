@@ -11,7 +11,7 @@ Generate the `visual-notes` concept map for **$ARGUMENTS** using the **plugin** 
    ```
 2. Force the plugin to (re)extract — this overrides any `_pinned` and writes an unpinned, plugin-owned `{basename}-overview.json`:
    ```bash
-   obsidian eval code="app.commands.executeCommandById('visual-notes:regenerate-current-note-force')"
+   obsidian eval code="app.commands.executeCommandById('visual-daily-notes:regenerate-current-note-force')"
    ```
 
 Extraction runs async (~$0.006 per run); the fence re-renders when the sidecar lands. To hand the doc back to the agent engine afterward, re-run `/obsidian-visual-summary-agent` (the hook re-pins).

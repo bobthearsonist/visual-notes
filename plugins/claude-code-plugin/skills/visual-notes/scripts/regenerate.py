@@ -10,7 +10,7 @@ sidecars inside an Obsidian vault. In the dual-engine model:
   The plugin's LLM extractor sees the pin and stands down, so the agent's
   curated graph is what the ```visual-notes``` fence renders.
 - Engine B (plugin): driven separately via the plugin command
-  `visual-notes:regenerate-current-note-force` (overrides the pin).
+  `visual-daily-notes:regenerate-current-note-force` (overrides the pin).
 
 The write-back is a plain filesystem write (NOT a tool call), so it does not
 re-trigger the PostToolUse hook. The fence renders the JSON sidecar directly, so
@@ -78,7 +78,7 @@ def vault_root_for(path: Path) -> Path | None:
 
 
 # The Obsidian plugin's id; its settings live in <vault>/.obsidian/plugins/<id>/data.json.
-PLUGIN_ID = "visual-notes"
+PLUGIN_ID = "visual-daily-notes"
 
 
 def _run(args: list[str]) -> str | None:
