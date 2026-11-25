@@ -19,6 +19,8 @@ export interface VisualNotesSettings {
   firstRunNoticeShown: boolean;
   useDailyContext: boolean;
   dailyContextId: string;
+  /** Per-machine YAML/JSON file whose `obsidian:` block lists the note folders the agent hook acts on. */
+  agentConfigPath: string;
 }
 
 export const DEFAULT_SETTINGS: VisualNotesSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: VisualNotesSettings = {
   firstRunNoticeShown: false,
   useDailyContext: true,
   dailyContextId: "",
+  agentConfigPath: "",
 };
 
 export function currentLocalDate(): string {
@@ -161,6 +164,21 @@ export class VisualNotesSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.dailyContextId)
           .onChange(async (value) => {
             this.plugin.settings.dailyContextId = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    containerEl.createEl("h3", { text: "Agents" });
+
+    new Setting(containerEl)
+      .setName("Agent config file")
+      .setDesc("Path to a YAML or JSON file on this machine whose obsidian: block lists your daily and session folders. The agent plugin's hook only conforms sidecars in those folders. Leave blank to let it act on any -overview.json in this vault. ~ is expanded.")
+      .addText((text) => {
+        text
+          .setPlaceholder("~/agent-config.yaml")
+          .setValue(this.plugin.settings.agentConfigPath)
+          .onChange(async (value) => {
+            this.plugin.settings.agentConfigPath = value.trim();
             await this.plugin.saveSettings();
           });
       });
