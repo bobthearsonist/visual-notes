@@ -17,6 +17,16 @@ plugin's ```` ```visual-notes ```` code fence. Two engines can author the graph
 (pick explicitly per invocation); three tiers organize it: session whiteboards,
 daily overviews, and on-demand rollup views.
 
+## Where this fits
+
+This skill covers only the visual sidecar. Generic Obsidian work (CLI syntax,
+Markdown, properties) belongs to the official `obsidian:obsidian-cli` and
+`obsidian:obsidian-markdown` skills, and writing the notes themselves belongs to
+`obsidian-notes`. Two local rules override the general CLI guidance:
+
+- **Put `vault=` first on every CLI call** (`obsidian vault="$VAULT" …`, where `$VAULT` is the last folder of the vault's path); anywhere else it is ignored and the command runs against whichever vault is focused.
+- **Write sidecars with your own file-write tool.** Notes go through Obsidian (see `obsidian-notes`), but the PostToolUse hook that conforms and pins a sidecar fires only on the agent's Write/Edit of `*-overview.json`. A sidecar is plain JSON that no editor tab or date-stamping plugin touches, so writing it directly is safe.
+
 ## Quick Reference
 
 | Need | Do |
@@ -75,8 +85,8 @@ The fence renders the JSON sidecar directly.
 ### Plugin mode — driving the extractor
 
 ```bash
-obsidian open path="{sessions_folder}/{YYYY-MM-DD topic}/{YYYY-MM-DD topic}.md"
-obsidian eval code="app.commands.executeCommandById('visual-daily-notes:regenerate-current-note-force')"
+obsidian vault="$VAULT" open path="{sessions_folder}/{YYYY-MM-DD topic}/{YYYY-MM-DD topic}.md"
+obsidian vault="$VAULT" eval code="app.commands.executeCommandById('visual-daily-notes:regenerate-current-note-force')"
 ```
 
 Fire-and-forget: extraction runs async (~$0.006/run) and the fence re-renders when
@@ -154,7 +164,7 @@ tags plus its own `{YYYYMMDD}-overview.json` graph.
 Triggered by user request. Load [visual-heuristic.md](references/visual-heuristic.md) for template mappings.
 
 1. **Parse the request** -- what type of rollup? What date range? What tag filters?
-2. **Query data** -- use Obsidian CLI Dataview queries to pull session summaries matching the filters
+2. **Query data** -- run Dataview queries through `obsidian vault="$VAULT" eval` (as `obsidian-notes` shows) to pull session summaries matching the filters
 3. **Extract structured data** -- outcomes, tools, tags, metrics, dates from the matching summaries
 4. **Select visual type** -- from the rollup templates table in visual-heuristic.md
 5. **Generate visual**:
