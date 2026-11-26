@@ -282,7 +282,7 @@ honors whatever you produce.
   "nodes": [
     {"data": {"id": "matcher-bug",      "label": "matcher field\nmisuse",     "sectionId": "h2-ai-session-posttooluse-hook-fix"}, "classes": "decision completed", "position": {"x": 0,   "y": 100}},
     {"data": {"id": "matcher-if-split", "label": "matcher / if\nsplit",       "sectionId": "h2-ai-session-posttooluse-hook-fix"}, "classes": "decision completed", "position": {"x": 250, "y": 100}},
-    {"data": {"id": "tight-pattern",    "label": "Captain's Log\nscope",      "sectionId": "h2-ai-session-posttooluse-hook-fix"}, "classes": "decision completed", "position": {"x": 500, "y": 100}},
+    {"data": {"id": "tight-pattern",    "label": "Session log\nscope",        "sectionId": "h2-ai-session-posttooluse-hook-fix"}, "classes": "decision completed", "position": {"x": 500, "y": 100}},
     {"data": {"id": "posttooluse-hook", "label": "PostToolUse\nhook",         "sectionId": "h2-ai-session-posttooluse-hook-fix"}, "classes": "system completed",   "position": {"x": 250, "y": 350}},
     {"data": {"id": "config-staleness", "label": "config staleness\ngotcha",  "sectionId": "h2-notes"},                            "classes": "decision context",   "position": {"x": 250, "y": 600}}
   ],
