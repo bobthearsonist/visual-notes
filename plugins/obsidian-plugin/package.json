@@ -1,6 +1,6 @@
 {
   "name": "@visual-notes/obsidian-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Obsidian plugin that watches daily notes and renders an LLM-extracted concept map inline.",
   "private": true,
   "main": "main.js",
