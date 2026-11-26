@@ -1,7 +1,7 @@
 {
   "name": "visual-notes",
   "description": "Agent side of Visual Notes: a skill for authoring concept-map sidecars, commands for agent or plugin extraction, and a hook that conforms and pins agent-written sidecars so the Obsidian plugin renders them.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "bobthearsonist",
     "url": "https://github.com/bobthearsonist"
